@@ -17,6 +17,7 @@ namespace Snow
         private Camera _camera;
         private ParticleSystem _particles;
         private DebugOverlay _debug;
+        private DebugConsole _console;
         private Player _player;
         private Tilemap _tilemap;
         private Random _random;
@@ -43,6 +44,9 @@ namespace Snow
 
         protected override void LoadContent()
         {
+            _console = new DebugConsole();
+            _console.Open();
+
             _graphicsManager = new GraphicsManager(GraphicsDevice);
             _input = new InputManager();
             _postProcessing = new PostProcessing(GraphicsDevice, 320, 180);
@@ -52,49 +56,44 @@ namespace Snow
             _random = new Random();
             _windTimer = 0f;
 
-            // Load your level and tileset
+            _console.Log("Snow Engine initialized");
+
             try
             {
                 LoadLevel("levels/lvl.json", "assets/world_tileset.png");
+                _console.LogSuccess("Level loaded successfully");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to load level: {ex.Message}");
-                Console.WriteLine("Creating fallback infinite floor...");
+                _console.LogError($"Failed to load level: {ex.Message}");
+                _console.Log("Using fallback infinite floor");
                 CreateInfiniteFloor();
             }
 
             _player = new Player(new Vector2(160, 130), GraphicsDevice, _input, _graphicsManager, _particles);
+            _console.Log("Player spawned at (160, 130)");
             
             _debug.Enabled = true;
         }
 
         private void LoadLevel(string levelPath, string tilesetPath)
         {
-            // Load level data from JSON
             LevelData levelData = LevelLoader.LoadLevel(levelPath);
-            
-            // Load and split tileset into individual tiles
             List<Texture2D> tileset = LoadTileset(tilesetPath, levelData.TileSize);
-            
-            // Create the tilemap
             _tilemap = new Tilemap(levelData, tileset);
             
-            Console.WriteLine($"Level loaded: {levelData.GridWidth}x{levelData.GridHeight}, TileSize: {levelData.TileSize}");
-            Console.WriteLine($"Tileset loaded: {tileset.Count} tiles");
+            _console.Log($"Level: {levelData.GridWidth}x{levelData.GridHeight}, TileSize: {levelData.TileSize}");
+            _console.Log($"Tileset: {tileset.Count} tiles loaded");
         }
 
         private List<Texture2D> LoadTileset(string tilesetPath, int tileSize)
         {
             List<Texture2D> tiles = new List<Texture2D>();
-            
-            // Load the full tileset image
             Texture2D tilesetImage = _graphicsManager.LoadTexture("tileset", tilesetPath);
             
             int tilesX = tilesetImage.Width / tileSize;
             int tilesY = tilesetImage.Height / tileSize;
             
-            // Extract each tile from the tileset
             Color[] tilesetData = new Color[tilesetImage.Width * tilesetImage.Height];
             tilesetImage.GetData(tilesetData);
             
@@ -123,7 +122,6 @@ namespace Snow
                 }
             }
             
-            Console.WriteLine($"Extracted {tiles.Count} tiles from tileset ({tilesX}x{tilesY})");
             return tiles;
         }
 
@@ -226,7 +224,6 @@ namespace Snow
                 transformMatrix: _camera.GetTransformMatrix()
             );
 
-            // Draw the tilemap
             _tilemap.Draw(_graphicsManager.SpriteBatch, _camera);
 
             _graphicsManager.SpriteBatch.End();
@@ -255,6 +252,7 @@ namespace Snow
         protected override void UnloadContent()
         {
             _debug?.Dispose();
+            _console?.Dispose();
             _particles?.Dispose();
             _postProcessing?.Dispose();
             _graphicsManager?.Dispose();
@@ -262,5 +260,3 @@ namespace Snow
         }
     }
 }
-
-
