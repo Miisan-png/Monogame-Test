@@ -52,11 +52,79 @@ namespace Snow
             _random = new Random();
             _windTimer = 0f;
 
-            CreateInfiniteFloor();
+            // Load your level and tileset
+            try
+            {
+                LoadLevel("levels/lvl.json", "assets/world_tileset.png");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to load level: {ex.Message}");
+                Console.WriteLine("Creating fallback infinite floor...");
+                CreateInfiniteFloor();
+            }
 
             _player = new Player(new Vector2(160, 130), GraphicsDevice, _input, _graphicsManager, _particles);
             
             _debug.Enabled = true;
+        }
+
+        private void LoadLevel(string levelPath, string tilesetPath)
+        {
+            // Load level data from JSON
+            LevelData levelData = LevelLoader.LoadLevel(levelPath);
+            
+            // Load and split tileset into individual tiles
+            List<Texture2D> tileset = LoadTileset(tilesetPath, levelData.TileSize);
+            
+            // Create the tilemap
+            _tilemap = new Tilemap(levelData, tileset);
+            
+            Console.WriteLine($"Level loaded: {levelData.GridWidth}x{levelData.GridHeight}, TileSize: {levelData.TileSize}");
+            Console.WriteLine($"Tileset loaded: {tileset.Count} tiles");
+        }
+
+        private List<Texture2D> LoadTileset(string tilesetPath, int tileSize)
+        {
+            List<Texture2D> tiles = new List<Texture2D>();
+            
+            // Load the full tileset image
+            Texture2D tilesetImage = _graphicsManager.LoadTexture("tileset", tilesetPath);
+            
+            int tilesX = tilesetImage.Width / tileSize;
+            int tilesY = tilesetImage.Height / tileSize;
+            
+            // Extract each tile from the tileset
+            Color[] tilesetData = new Color[tilesetImage.Width * tilesetImage.Height];
+            tilesetImage.GetData(tilesetData);
+            
+            for (int y = 0; y < tilesY; y++)
+            {
+                for (int x = 0; x < tilesX; x++)
+                {
+                    Texture2D tile = new Texture2D(GraphicsDevice, tileSize, tileSize);
+                    Color[] tileData = new Color[tileSize * tileSize];
+                    
+                    for (int ty = 0; ty < tileSize; ty++)
+                    {
+                        for (int tx = 0; tx < tileSize; tx++)
+                        {
+                            int sourceX = x * tileSize + tx;
+                            int sourceY = y * tileSize + ty;
+                            int sourceIndex = sourceY * tilesetImage.Width + sourceX;
+                            int destIndex = ty * tileSize + tx;
+                            
+                            tileData[destIndex] = tilesetData[sourceIndex];
+                        }
+                    }
+                    
+                    tile.SetData(tileData);
+                    tiles.Add(tile);
+                }
+            }
+            
+            Console.WriteLine($"Extracted {tiles.Count} tiles from tileset ({tilesX}x{tilesY})");
+            return tiles;
         }
 
         private void CreateInfiniteFloor()
@@ -158,6 +226,9 @@ namespace Snow
                 transformMatrix: _camera.GetTransformMatrix()
             );
 
+            // Draw the tilemap
+            _tilemap.Draw(_graphicsManager.SpriteBatch, _camera);
+
             _graphicsManager.SpriteBatch.End();
 
             _particles.Draw(_graphicsManager.SpriteBatch, _camera.GetTransformMatrix());
@@ -191,3 +262,5 @@ namespace Snow
         }
     }
 }
+
+
