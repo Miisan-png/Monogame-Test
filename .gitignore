@@ -1,0 +1,10 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+Content/bin/
+Content/obj/
+*.cachefile
+*.mgstats
+EOF

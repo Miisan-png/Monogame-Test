@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Azar\\Desktop\\Monogame\\Monogame-Test\\snow\\Snow.csproj": {}
+    "C:\\Users\\Azar\\Desktop\\Monogame\\Monogame-Test\\Snow\\Snow.csproj": {}
   },
   "projects": {
-    "C:\\Users\\Azar\\Desktop\\Monogame\\Monogame-Test\\snow\\Snow.csproj": {
+    "C:\\Users\\Azar\\Desktop\\Monogame\\Monogame-Test\\Snow\\Snow.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Azar\\Desktop\\Monogame\\Monogame-Test\\snow\\Snow.csproj",
+        "projectUniqueName": "C:\\Users\\Azar\\Desktop\\Monogame\\Monogame-Test\\Snow\\Snow.csproj",
         "projectName": "Snow",
-        "projectPath": "C:\\Users\\Azar\\Desktop\\Monogame\\Monogame-Test\\snow\\Snow.csproj",
+        "projectPath": "C:\\Users\\Azar\\Desktop\\Monogame\\Monogame-Test\\Snow\\Snow.csproj",
         "packagesPath": "C:\\Users\\Azar\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Azar\\Desktop\\Monogame\\Monogame-Test\\snow\\obj\\",
+        "outputPath": "C:\\Users\\Azar\\Desktop\\Monogame\\Monogame-Test\\Snow\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Azar\\AppData\\Roaming\\NuGet\\NuGet.Config"

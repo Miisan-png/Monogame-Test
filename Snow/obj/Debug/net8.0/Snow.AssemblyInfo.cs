@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Snow")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5c40f5c36a5bf9a6f927795186b2ea8bd1d97a5f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+246880a1eaef7676c4eec2f3d133f82153644cac")]
 [assembly: System.Reflection.AssemblyProductAttribute("Snow")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Snow")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
