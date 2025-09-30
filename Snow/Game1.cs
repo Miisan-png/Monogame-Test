@@ -1,4 +1,4 @@
-﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Snow.Engine;
@@ -13,6 +13,7 @@ namespace Snow
         private InputManager _input;
         private PostProcessing _postProcessing;
         private Camera _camera;
+        private ParticleSystem _particles;
         private Player _player;
 
         private Color[] _modulateColors = new Color[]
@@ -51,8 +52,9 @@ namespace Snow
             _input = new InputManager();
             _postProcessing = new PostProcessing(GraphicsDevice, 320, 180);
             _camera = new Camera(320, 180, 320, 180);
+            _particles = new ParticleSystem(GraphicsDevice, 2000);
 
-            _player = new Player(new Vector2(160, 50), GraphicsDevice, _input, _graphicsManager);
+            _player = new Player(new Vector2(160, 50), GraphicsDevice, _input, _graphicsManager, _particles);
         }
 
         protected override void Update(GameTime gameTime)
@@ -70,6 +72,9 @@ namespace Snow
 
             _player.Update(gameTime);
             _camera.Follow(_player.Position);
+            
+            float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+            _particles.Update(deltaTime);
 
             base.Update(gameTime);
         }
@@ -85,6 +90,8 @@ namespace Snow
             _player.Draw(_graphicsManager.SpriteBatch, gameTime);
             _graphicsManager.SpriteBatch.End();
 
+            _particles.Draw(_graphicsManager.SpriteBatch, _camera.GetTransformMatrix());
+
             _postProcessing.EndGameRender();
 
             _postProcessing.ApplyPostProcessing();
@@ -95,15 +102,10 @@ namespace Snow
 
         protected override void UnloadContent()
         {
+            _particles?.Dispose();
             _postProcessing?.Dispose();
             _graphicsManager?.Dispose();
             base.UnloadContent();
         }
     }
 }
-
-
-
-
-
-
