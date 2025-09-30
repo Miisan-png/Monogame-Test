@@ -7,50 +7,95 @@ namespace Snow.Game
 {
     public class Player : Actor
     {
-        private Texture2D _texture;
-        private Color _color;
+        private PhysicsComponent _physics;
+        private InputManager _input;
+        private AnimatedSprite _sprite;
+        private GraphicsManager _graphics;
+        
         public Vector2 Size { get; set; }
 
-        public Player(Vector2 position, GraphicsDevice graphicsDevice) : base(position)
+        public Player(Vector2 position, GraphicsDevice graphicsDevice, InputManager input, GraphicsManager graphics) : base(position)
         {
-            Size = new Vector2(32, 64);
-            _color = Color.Red;
-            
-            _texture = new Texture2D(graphicsDevice, 1, 1);
-            _texture.SetData(new[] { Color.White });
+            Size = new Vector2(16, 24);
+            _input = input;
+            _graphics = graphics;
+
+            _physics = new PhysicsComponent();
+            _physics.IsGrounded = true;
+
+            _sprite = new AnimatedSprite();
+            LoadAnimations();
+        }
+
+        private void LoadAnimations()
+        {
+            Animation idle = new Animation("idle", 0.1f, true);
+            for (int i = 1; i <= 6; i++)
+            {
+                idle.Frames.Add(_graphics.LoadTexture($"player_idle_{i}", $"assets/Main/Player/Player{i}.png"));
+            }
+            _sprite.AddAnimation(idle);
+
+            Animation walk = new Animation("walk", 0.08f, true);
+            for (int i = 7; i <= 10; i++)
+            {
+                walk.Frames.Add(_graphics.LoadTexture($"player_walk_{i}", $"assets/Main/Player/Player{i}.png"));
+            }
+            _sprite.AddAnimation(walk);
+
+            _sprite.Play("idle");
         }
 
         public override void Update(GameTime gameTime)
         {
-            HandleInput();
+            float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+            float moveInput = _input.GetAxisHorizontal();
+            bool jumpPressed = _input.IsKeyPressed(Keys.C);
+            bool jumpReleased = _input.IsKeyReleased(Keys.C);
+            bool dashPressed = _input.IsKeyPressed(Keys.X);
+
+            _physics.Update(deltaTime, moveInput, jumpPressed, jumpReleased, dashPressed);
+
+            if (System.Math.Abs(moveInput) > 0.1f)
+            {
+                _sprite.Play("walk");
+                _sprite.FlipX = moveInput < 0;
+            }
+            else
+            {
+                _sprite.Play("idle");
+            }
+
+            _sprite.Update(deltaTime);
+
+            Velocity = _physics.Velocity;
+
+            if (Position.Y > 500)
+            {
+                _physics.IsGrounded = true;
+                Position = new Vector2(Position.X, 500);
+                if (_physics.Velocity.Y > 0)
+                {
+                    Vector2 vel = _physics.Velocity;
+                    vel.Y = 0;
+                    _physics.Velocity = vel;
+                }
+            }
+            else
+            {
+                _physics.IsGrounded = false;
+            }
+
             base.Update(gameTime);
-        }
-
-        private void HandleInput()
-        {
-            KeyboardState keyboard = Keyboard.GetState();
-            Vector2 input = Vector2.Zero;
-
-            if (keyboard.IsKeyDown(Keys.A) || keyboard.IsKeyDown(Keys.Left))
-                input.X -= 1;
-            if (keyboard.IsKeyDown(Keys.D) || keyboard.IsKeyDown(Keys.Right))
-                input.X += 1;
-
-            Velocity = input * 200f;
         }
 
         public override void Draw(SpriteBatch spriteBatch, GameTime gameTime)
         {
             if (!IsActive) return;
 
-            Rectangle destRect = new Rectangle(
-                (int)Position.X,
-                (int)Position.Y,
-                (int)Size.X,
-                (int)Size.Y
-            );
-
-            spriteBatch.Draw(_texture, destRect, _color);
+            _sprite.Draw(spriteBatch, Position, Color.White, 1f);
         }
     }
 }
+

@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 
-namespace Snow
+namespace Snow.Engine
 {
     public class GraphicsManager
     {
@@ -77,3 +77,9 @@ namespace Snow
         }
     }
 }
+
+
+
+
+
+
