@@ -97,22 +97,6 @@ namespace Snow.Game
 
             Velocity = _physics.Velocity;
 
-            if (Position.Y > 150)
-            {
-                _physics.IsGrounded = true;
-                Position = new Vector2(Position.X, 150);
-                if (_physics.Velocity.Y > 0)
-                {
-                    Vector2 vel = _physics.Velocity;
-                    vel.Y = 0;
-                    _physics.Velocity = vel;
-                }
-            }
-            else
-            {
-                _physics.IsGrounded = false;
-            }
-
             base.Update(gameTime);
         }
 
@@ -124,11 +108,3 @@ namespace Snow.Game
         }
     }
 }
-
-
-
-
-
-
-
-
