@@ -52,85 +52,51 @@ namespace Snow
             _random = new Random();
             _windTimer = 0f;
 
-            LoadLevel("levels/level1.json");
+            CreateInfiniteFloor();
 
-            _player = new Player(new Vector2(160, 10), GraphicsDevice, _input, _graphicsManager, _particles);
+            _player = new Player(new Vector2(160, 130), GraphicsDevice, _input, _graphicsManager, _particles);
             
             _debug.Enabled = true;
         }
 
-        private void LoadLevel(string levelPath)
+        private void CreateInfiniteFloor()
         {
-            try
+            int width = 1000;
+            int height = 50;
+            int tileSize = 16;
+            int floorY = 11;
+
+            LevelData levelData = new LevelData
             {
-                Console.WriteLine($"Loading level: {levelPath}");
-                LevelData levelData = LevelLoader.LoadLevel(levelPath);
+                TileSize = tileSize,
+                GridWidth = width,
+                GridHeight = height,
+                WorldData = new int[height][],
+                CollisionData = new bool[height][]
+            };
+
+            for (int y = 0; y < height; y++)
+            {
+                levelData.WorldData[y] = new int[width];
+                levelData.CollisionData[y] = new bool[width];
                 
-                Console.WriteLine($"Level size: {levelData.GridWidth}x{levelData.GridHeight}");
-                Console.WriteLine($"Tile size: {levelData.TileSize}");
-                
-                int solidCount = 0;
-                int tileCount = 0;
-                for (int y = 0; y < levelData.GridHeight; y++)
+                for (int x = 0; x < width; x++)
                 {
-                    for (int x = 0; x < levelData.GridWidth; x++)
+                    levelData.WorldData[y][x] = 0;
+                    
+                    if (y >= floorY)
                     {
-                        if (levelData.WorldData[y][x] > 0)
-                            tileCount++;
-                        if (levelData.CollisionData[y][x])
-                            solidCount++;
+                        levelData.CollisionData[y][x] = true;
+                    }
+                    else
+                    {
+                        levelData.CollisionData[y][x] = false;
                     }
                 }
-                Console.WriteLine($"Tiles placed: {tileCount}");
-                Console.WriteLine($"Solid tiles: {solidCount}");
-
-                Texture2D tilesetImage = _graphicsManager.LoadTexture("tileset", "assets/Tilesheet.png");
-                
-                List<Texture2D> tileset = new List<Texture2D>();
-                int tilesX = tilesetImage.Width / levelData.TileSize;
-                int tilesY = tilesetImage.Height / levelData.TileSize;
-                
-                Console.WriteLine($"Tileset: {tilesX}x{tilesY} tiles");
-
-                for (int y = 0; y < tilesY; y++)
-                {
-                    for (int x = 0; x < tilesX; x++)
-                    {
-                        Texture2D tile = new Texture2D(GraphicsDevice, levelData.TileSize, levelData.TileSize);
-                        Color[] data = new Color[levelData.TileSize * levelData.TileSize];
-                        Rectangle sourceRect = new Rectangle(
-                            x * levelData.TileSize,
-                            y * levelData.TileSize,
-                            levelData.TileSize,
-                            levelData.TileSize
-                        );
-                        
-                        Color[] fullData = new Color[tilesetImage.Width * tilesetImage.Height];
-                        tilesetImage.GetData(fullData);
-                        
-                        for (int ty = 0; ty < levelData.TileSize; ty++)
-                        {
-                            for (int tx = 0; tx < levelData.TileSize; tx++)
-                            {
-                                int sourceIndex = (sourceRect.Y + ty) * tilesetImage.Width + (sourceRect.X + tx);
-                                int destIndex = ty * levelData.TileSize + tx;
-                                data[destIndex] = fullData[sourceIndex];
-                            }
-                        }
-                        
-                        tile.SetData(data);
-                        tileset.Add(tile);
-                    }
-                }
-
-                _tilemap = new Tilemap(levelData, tileset);
-                Console.WriteLine("Tilemap created!");
             }
-            catch (Exception e)
-            {
-                Console.WriteLine($"ERROR loading level: {e.Message}");
-                Console.WriteLine(e.StackTrace);
-            }
+
+            List<Texture2D> tileset = new List<Texture2D>();
+            _tilemap = new Tilemap(levelData, tileset);
         }
 
         protected override void Update(GameTime gameTime)
@@ -147,8 +113,12 @@ namespace Snow
 
             float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
+            _player.Update(gameTime);
+            
+            CollisionSystem.ResolveCollision(_player, _tilemap, deltaTime);
+
             _windTimer += deltaTime;
-            if (_windTimer > 0.05f && _tilemap != null)
+            if (_windTimer > 0.05f)
             {
                 float cameraLeft = _camera.Position.X;
                 float cameraTop = _camera.Position.Y;
@@ -172,13 +142,6 @@ namespace Snow
                 _windTimer = 0f;
             }
 
-            _player.Update(gameTime);
-            
-            if (_tilemap != null)
-            {
-                CollisionSystem.ResolveCollision(_player, _tilemap, deltaTime);
-            }
-
             _camera.Follow(_player.Position);
             _particles.Update(deltaTime);
             _debug.Update(gameTime);
@@ -194,11 +157,6 @@ namespace Snow
                 samplerState: SamplerState.PointClamp,
                 transformMatrix: _camera.GetTransformMatrix()
             );
-
-            if (_tilemap != null)
-            {
-                _tilemap.Draw(_graphicsManager.SpriteBatch, _camera);
-            }
 
             _graphicsManager.SpriteBatch.End();
 
@@ -233,11 +191,3 @@ namespace Snow
         }
     }
 }
-
-
-
-
-
-
-
-

@@ -96,8 +96,6 @@ namespace Snow.Game
             _sprite.Update(deltaTime);
 
             Velocity = _physics.Velocity;
-
-            base.Update(gameTime);
         }
 
         public override void Draw(SpriteBatch spriteBatch, GameTime gameTime)
