@@ -22,6 +22,9 @@ namespace Snow
         private Tilemap _tilemap;
         private Random _random;
         private float _windTimer;
+        private bool _wasGrounded;
+        private bool _wasDashing;
+        private GlowSystem _glowSystem;
 
         public Game1()
         {
@@ -55,6 +58,23 @@ namespace Snow
             _debug = new DebugOverlay(GraphicsDevice);
             _random = new Random();
             _windTimer = 0f;
+            _wasGrounded = false;
+            _wasDashing = false;
+
+            try
+            {
+                Effect bloomEffect = Content.Load<Effect>("Shaders/Bloom");
+                Effect modulateEffect = Content.Load<Effect>("Shaders/Modulate");
+                _postProcessing.LoadShaders(bloomEffect, modulateEffect);
+                _postProcessing.CanvasModulate = new Color(0.55f, 0.35f, 0.85f, 1.0f);
+                _postProcessing.BloomThreshold = 0.35f;
+                _postProcessing.BloomIntensity = 3.5f;
+                _console.LogSuccess("Shaders loaded");
+            }
+            catch (Exception ex)
+            {
+                _console.LogWarning($"Shaders not found: {ex.Message}");
+            }
 
             _console.Log("Snow Engine initialized");
 
@@ -72,6 +92,18 @@ namespace Snow
 
             _player = new Player(new Vector2(160, 130), GraphicsDevice, _input, _graphicsManager, _particles);
             _console.Log("Player spawned at (160, 130)");
+            
+            _glowSystem = new GlowSystem(GraphicsDevice);
+            
+            _glowSystem.AddOrb(new Vector2(100, 100), 25f, new Color(255, 40, 255), 4.5f, 2.5f);
+            _glowSystem.AddOrb(new Vector2(250, 80), 20f, new Color(80, 255, 255), 4.0f, 2.0f);
+            _glowSystem.AddOrb(new Vector2(180, 140), 30f, new Color(255, 60, 200), 4.2f, 2.2f);
+            _glowSystem.AddOrb(new Vector2(140, 90), 18f, new Color(255, 100, 255), 3.8f, 1.8f);
+            
+            _glowSystem.AddBlob(new Vector2(200, 160), 50fx, new Color(200, 80, 255), 3.5f);
+            _glowSystem.AddBlob(new Vector2(120, 120), 60f, new Color(255, 60, 255), 3.2f);
+            
+            _console.Log("Glow orbs added to scene");
             
             _debug.Enabled = true;
         }
@@ -179,6 +211,21 @@ namespace Snow
 
             float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
+            var physics = _player.GetPhysics();
+
+            if (physics.IsDashing && !_wasDashing)
+            {
+                _camera.Shake(2f, 0.15f);
+            }
+
+            if (physics.IsGrounded && !_wasGrounded)
+            {
+                _camera.Shake(1.5f, 0.12f);
+            }
+
+            _wasGrounded = physics.IsGrounded;
+            _wasDashing = physics.IsDashing;
+
             _player.Update(gameTime);
             
             CollisionSystem.ResolveCollision(_player, _tilemap, deltaTime);
@@ -209,7 +256,9 @@ namespace Snow
             }
 
             _camera.Follow(_player.Position);
+            _camera.Update(deltaTime);
             _particles.Update(deltaTime);
+            _glowSystem.Update(deltaTime);
             _debug.Update(gameTime);
 
             base.Update(gameTime);
@@ -226,6 +275,16 @@ namespace Snow
 
             _tilemap.Draw(_graphicsManager.SpriteBatch, _camera);
 
+            _graphicsManager.SpriteBatch.End();
+
+            _graphicsManager.SpriteBatch.Begin(
+                samplerState: SamplerState.LinearClamp,
+                blendState: BlendState.Additive,
+                transformMatrix: _camera.GetTransformMatrix()
+            );
+            
+            _glowSystem.DrawOrbs(_graphicsManager.SpriteBatch);
+            
             _graphicsManager.SpriteBatch.End();
 
             _particles.Draw(_graphicsManager.SpriteBatch, _camera.GetTransformMatrix());
@@ -256,7 +315,10 @@ namespace Snow
             _particles?.Dispose();
             _postProcessing?.Dispose();
             _graphicsManager?.Dispose();
+            _glowSystem?.Dispose();
             base.UnloadContent();
         }
     }
 }
+
+

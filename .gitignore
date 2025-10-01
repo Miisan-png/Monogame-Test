@@ -1,10 +1,36 @@
-bin/
-obj/
-.vs/
+# MonoGame/Visual Studio
 *.user
 *.suo
-Content/bin/
-Content/obj/
+*.cache
+.vs/
+bin/
+obj/
 *.cachefile
 *.mgstats
-EOF
+
+# Content Pipeline
+Content/bin/
+Content/obj/
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.so
+
+# Python virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

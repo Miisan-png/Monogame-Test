@@ -2,9 +2,19 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Snow.Engine;
+using System.Collections.Generic;
 
 namespace Snow.Game
 {
+    public class GhostTrail
+    {
+        public Vector2 Position;
+        public Texture2D Texture;
+        public float Alpha;
+        public float Life;
+        public bool FlipX;
+    }
+
     public class Player : Actor
     {
         private PhysicsComponent _physics;
@@ -16,6 +26,9 @@ namespace Snow.Game
         public Vector2 Size { get; set; }
         private float _dustTimer;
         private bool _wasGrounded;
+        private bool _wasDashing;
+        private List<GhostTrail> _ghostTrails;
+        private float _ghostSpawnTimer;
 
         public Player(Vector2 position, GraphicsDevice graphicsDevice, InputManager input, GraphicsManager graphics, ParticleSystem particles) : base(position)
         {
@@ -32,6 +45,9 @@ namespace Snow.Game
             
             _dustTimer = 0f;
             _wasGrounded = false;
+            _wasDashing = false;
+            _ghostTrails = new List<GhostTrail>();
+            _ghostSpawnTimer = 0f;
         }
 
         private void LoadAnimations()
@@ -58,27 +74,39 @@ namespace Snow.Game
             float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
             float moveInput = _input.GetAxisHorizontal();
+            float verticalInput = _input.GetAxisVertical();
             bool jumpPressed = _input.IsKeyPressed(Keys.C);
             bool jumpReleased = _input.IsKeyReleased(Keys.C);
             bool dashPressed = _input.IsKeyPressed(Keys.X);
 
-            _physics.Update(deltaTime, moveInput, jumpPressed, jumpReleased, dashPressed);
+            bool justDashed = dashPressed && _physics.CanDash;
 
-            if (System.Math.Abs(moveInput) > 0.1f)
+            _physics.Update(deltaTime, moveInput, verticalInput, jumpPressed, jumpReleased, dashPressed);
+
+            if (_physics.IsDashing)
+            {
+                _ghostSpawnTimer += deltaTime;
+                if (_ghostSpawnTimer > 0.08f)
+                {
+                    SpawnGhostTrail();
+                    _ghostSpawnTimer = 0f;
+                }
+            }
+
+            UpdateGhostTrails(deltaTime);
+
+            if (System.Math.Abs(moveInput) > 0.1f && _physics.IsGrounded)
             {
                 _sprite.Play("walk");
                 _sprite.FlipX = moveInput < 0;
                 
-                if (_physics.IsGrounded)
+                _dustTimer += deltaTime;
+                if (_dustTimer > 0.12f)
                 {
-                    _dustTimer += deltaTime;
-                    if (_dustTimer > 0.1f)
-                    {
-                        Vector2 dustPos = Position + new Vector2(8, 24);
-                        Vector2 dustDir = new Vector2(-System.Math.Sign(moveInput), -0.5f);
-                        _particles.EmitDust(dustPos, dustDir, 2, new Color(200, 200, 200));
-                        _dustTimer = 0f;
-                    }
+                    Vector2 dustPos = Position + new Vector2(8, 24);
+                    Vector2 dustDir = new Vector2(-System.Math.Sign(moveInput), -0.5f);
+                    _particles.EmitDust(dustPos, dustDir, 2, new Color(200, 200, 200));
+                    _dustTimer = 0f;
                 }
             }
             else
@@ -86,23 +114,81 @@ namespace Snow.Game
                 _sprite.Play("idle");
             }
 
+            if (System.Math.Abs(moveInput) > 0.1f)
+            {
+                _sprite.FlipX = moveInput < 0;
+            }
+
             if (!_wasGrounded && _physics.IsGrounded)
             {
                 Vector2 landPos = Position + new Vector2(8, 24);
-                _particles.EmitBurst(landPos, 8, 20f, 60f, new Color(220, 220, 220), 0.4f, 1f);
+                _particles.EmitBurst(landPos, 10, 30f, 70f, new Color(220, 220, 220), 0.4f, 1.2f);
             }
 
             _wasGrounded = _physics.IsGrounded;
+            _wasDashing = _physics.IsDashing;
             _sprite.Update(deltaTime);
 
             Velocity = _physics.Velocity;
+        }
+
+        private void SpawnGhostTrail()
+        {
+            Texture2D currentFrame = _graphics.GetTexture("player_walk_7");
+            
+            _ghostTrails.Add(new GhostTrail
+            {
+                Position = Position,
+                Texture = currentFrame,
+                Alpha = 0.25f,
+                Life = 0.4f,
+                FlipX = _sprite.FlipX
+            });
+        }
+
+        private void UpdateGhostTrails(float deltaTime)
+        {
+            for (int i = _ghostTrails.Count - 1; i >= 0; i--)
+            {
+                _ghostTrails[i].Life -= deltaTime;
+                _ghostTrails[i].Alpha = _ghostTrails[i].Life / 0.4f * 0.25f;
+                
+                if (_ghostTrails[i].Life <= 0)
+                {
+                    _ghostTrails.RemoveAt(i);
+                }
+            }
         }
 
         public override void Draw(SpriteBatch spriteBatch, GameTime gameTime)
         {
             if (!IsActive) return;
 
-            _sprite.Draw(spriteBatch, Position, Color.White, 1f);
+            foreach (var ghost in _ghostTrails)
+            {
+                Color ghostColor = new Color(255, 80, 255, (int)(ghost.Alpha * 255));
+                SpriteEffects effects = ghost.FlipX ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
+                
+                spriteBatch.Draw(
+                    ghost.Texture,
+                    ghost.Position,
+                    null,
+                    ghostColor,
+                    0f,
+                    Vector2.Zero,
+                    1f,
+                    effects,
+                    0f
+                );
+            }
+
+            Color playerColor = new Color(255, 100, 255);
+            _sprite.Draw(spriteBatch, Position, playerColor, 1f);
+        }
+
+        public PhysicsComponent GetPhysics()
+        {
+            return _physics;
         }
     }
 }

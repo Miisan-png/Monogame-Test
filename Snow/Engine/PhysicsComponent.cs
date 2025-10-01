@@ -7,24 +7,24 @@ namespace Snow.Engine
     {
         public Vector2 Velocity { get; set; }
         public bool IsGrounded { get; set; }
-        public bool OnWall { get; set; }
 
-        public float Gravity { get; set; } = 1200f;
-        public float MaxFallSpeed { get; set; } = 400f;
-        public float MoveSpeed { get; set; } = 180f;
-        public float Acceleration { get; set; } = 1200f;
+        public float Gravity { get; set; } = 1400f;
+        public float MaxFallSpeed { get; set; } = 320f;
+        public float MoveSpeed { get; set; } = 120f;
+        public float Acceleration { get; set; } = 800f;
+        public float AirAcceleration { get; set; } = 700f;
         public float Friction { get; set; } = 900f;
-        public float AirAcceleration { get; set; } = 800f;
         public float AirFriction { get; set; } = 400f;
 
-        public float JumpSpeed { get; set; } = 320f;
+        public float JumpSpeed { get; set; } = 240f;
         public float JumpCutMultiplier { get; set; } = 0.5f;
         public float CoyoteTime { get; set; } = 0.1f;
         public float JumpBufferTime { get; set; } = 0.1f;
 
-        public float DashSpeed { get; set; } = 400f;
-        public float DashDuration { get; set; } = 0.15f;
-        public float DashCooldown { get; set; } = 0.2f;
+        public float DashSpeed { get; set; } = 280f;
+        public float DashTime { get; set; } = 0.18f;
+        public float DashEndSpeedMult { get; set; } = 0.65f;
+        public float DashCooldown { get; set; } = 0.25f;
 
         private float _coyoteTimer;
         private float _jumpBufferTimer;
@@ -32,8 +32,18 @@ namespace Snow.Engine
         private float _dashCooldownTimer;
         private Vector2 _dashDirection;
         private bool _isDashing;
+        private bool _dashesLeft;
 
-        public void Update(float deltaTime, float moveInput, bool jumpPressed, bool jumpReleased, bool dashPressed)
+        public bool IsDashing => _isDashing;
+        public bool CanDash => _dashesLeft && _dashCooldownTimer <= 0;
+        public Vector2 DashDirection => _dashDirection;
+
+        public PhysicsComponent()
+        {
+            _dashesLeft = true;
+        }
+
+        public void Update(float deltaTime, float moveInput, float verticalInput, bool jumpPressed, bool jumpReleased, bool dashPressed)
         {
             UpdateTimers(deltaTime);
 
@@ -46,7 +56,12 @@ namespace Snow.Engine
             ApplyGravity(deltaTime);
             ApplyMovement(deltaTime, moveInput);
             HandleJump(jumpPressed, jumpReleased);
-            HandleDash(dashPressed, moveInput);
+            HandleDash(dashPressed, moveInput, verticalInput);
+
+            if (IsGrounded)
+            {
+                _dashesLeft = true;
+            }
         }
 
         private void UpdateTimers(float deltaTime)
@@ -121,24 +136,25 @@ namespace Snow.Engine
             }
         }
 
-        private void HandleDash(bool dashPressed, float moveInput)
+        private void HandleDash(bool dashPressed, float moveInput, float verticalInput)
         {
-            if (dashPressed && _dashCooldownTimer <= 0)
+            if (dashPressed && CanDash)
             {
                 _isDashing = true;
-                _dashTimer = DashDuration;
+                _dashTimer = DashTime;
                 _dashCooldownTimer = DashCooldown;
+                _dashesLeft = false;
 
-                Vector2 dir = Vector2.Zero;
-                if (Math.Abs(moveInput) > 0.01f)
-                    dir.X = Math.Sign(moveInput);
-                else
-                    dir.X = 1;
-
-                if (dir.LengthSquared() > 0)
-                    dir.Normalize();
-                else
+                Vector2 dir = new Vector2(moveInput, verticalInput);
+                
+                if (dir.LengthSquared() < 0.01f)
+                {
                     dir = Vector2.UnitX;
+                }
+                else
+                {
+                    dir.Normalize();
+                }
 
                 _dashDirection = dir;
                 Velocity = _dashDirection * DashSpeed;
@@ -151,7 +167,7 @@ namespace Snow.Engine
             if (_dashTimer <= 0)
             {
                 _isDashing = false;
-                Velocity *= 0.5f;
+                Velocity *= DashEndSpeedMult;
             }
         }
 
@@ -161,3 +177,7 @@ namespace Snow.Engine
         }
     }
 }
+
+
+
+

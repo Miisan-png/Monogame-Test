@@ -165,11 +165,3 @@ class TilePaletteWindow(QDialog):
             else:
                 painter.setPen(QPen(QColor(60, 60, 60), 1))
                 painter.drawRect(x, y, self.display_tile_size, self.display_tile_size)
-
-
-
-
-
-
-
-

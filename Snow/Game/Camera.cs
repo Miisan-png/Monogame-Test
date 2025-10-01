@@ -1,4 +1,5 @@
 using Microsoft.Xna.Framework;
+using System;
 
 namespace Snow.Engine
 {
@@ -11,6 +12,10 @@ namespace Snow.Engine
         public int ViewHeight { get; private set; }
 
         private Vector2 _currentRoomOrigin;
+        private float _shakeAmount;
+        private float _shakeTimer;
+        private Random _random;
+        private Vector2 _shakeOffset;
 
         public Camera(int viewWidth, int viewHeight, int roomWidth, int roomHeight)
         {
@@ -20,6 +25,35 @@ namespace Snow.Engine
             RoomHeight = roomHeight;
             Position = Vector2.Zero;
             _currentRoomOrigin = Vector2.Zero;
+            _random = new Random();
+            _shakeAmount = 0f;
+            _shakeTimer = 0f;
+            _shakeOffset = Vector2.Zero;
+        }
+
+        public void Shake(float amount, float duration)
+        {
+            _shakeAmount = amount;
+            _shakeTimer = duration;
+        }
+
+        public void Update(float deltaTime)
+        {
+            if (_shakeTimer > 0)
+            {
+                _shakeTimer -= deltaTime;
+                
+                float angle = (float)(_random.NextDouble() * Math.PI * 2);
+                float strength = _shakeAmount * (_shakeTimer / 0.2f);
+                _shakeOffset = new Vector2(
+                    (float)Math.Cos(angle) * strength,
+                    (float)Math.Sin(angle) * strength
+                );
+            }
+            else
+            {
+                _shakeOffset = Vector2.Zero;
+            }
         }
 
         public void Follow(Vector2 targetPosition)
@@ -33,7 +67,7 @@ namespace Snow.Engine
 
         public Matrix GetTransformMatrix()
         {
-            return Matrix.CreateTranslation(-Position.X, -Position.Y, 0);
+            return Matrix.CreateTranslation(-Position.X + _shakeOffset.X, -Position.Y + _shakeOffset.Y, 0);
         }
 
         public Vector2 ScreenToWorld(Vector2 screenPosition)
@@ -55,9 +89,3 @@ namespace Snow.Engine
         }
     }
 }
-
-
-
-
-
-

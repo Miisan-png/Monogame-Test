@@ -7,11 +7,16 @@ namespace Snow.Engine
     {
         private GraphicsDevice _graphicsDevice;
         private RenderTarget2D _gameRenderTarget;
-        private RenderTarget2D _bloomRenderTarget;
+        private RenderTarget2D _bloomExtractTarget;
+        private RenderTarget2D _bloomBlurHTarget;
+        private RenderTarget2D _bloomBlurVTarget;
         private SpriteBatch _spriteBatch;
+        private Effect _bloomEffect;
+        private Effect _modulateEffect;
 
-        public Color CanvasModulate { get; set; } = Color.White;
-        public float BloomIntensity { get; set; } = 0.3f;
+        public Color CanvasModulate { get; set; } = new Color(0.6f, 0.4f, 0.9f, 1.0f);
+        public float BloomThreshold { get; set; } = 0.5f;
+        public float BloomIntensity { get; set; } = 2.0f;
         public int GameWidth { get; private set; }
         public int GameHeight { get; private set; }
 
@@ -22,8 +27,16 @@ namespace Snow.Engine
             GameHeight = gameHeight;
 
             _gameRenderTarget = new RenderTarget2D(graphicsDevice, gameWidth, gameHeight);
-            _bloomRenderTarget = new RenderTarget2D(graphicsDevice, gameWidth, gameHeight);
+            _bloomExtractTarget = new RenderTarget2D(graphicsDevice, gameWidth, gameHeight);
+            _bloomBlurHTarget = new RenderTarget2D(graphicsDevice, gameWidth, gameHeight);
+            _bloomBlurVTarget = new RenderTarget2D(graphicsDevice, gameWidth, gameHeight);
             _spriteBatch = new SpriteBatch(graphicsDevice);
+        }
+
+        public void LoadShaders(Effect bloomEffect, Effect modulateEffect)
+        {
+            _bloomEffect = bloomEffect;
+            _modulateEffect = modulateEffect;
         }
 
         public void BeginGameRender()
@@ -39,11 +52,35 @@ namespace Snow.Engine
 
         public void ApplyPostProcessing()
         {
-            _graphicsDevice.SetRenderTarget(_bloomRenderTarget);
-            _graphicsDevice.Clear(Color.Transparent);
+            if (_bloomEffect == null || _modulateEffect == null)
+                return;
 
-            _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp);
-            _spriteBatch.Draw(_gameRenderTarget, Vector2.Zero, Color.White * BloomIntensity);
+            _bloomEffect.Parameters["BloomThreshold"].SetValue(BloomThreshold);
+            _bloomEffect.Parameters["BloomIntensity"].SetValue(BloomIntensity);
+            _bloomEffect.Parameters["TextureSize"].SetValue(new Vector2(GameWidth, GameHeight));
+
+            _graphicsDevice.SetRenderTarget(_bloomExtractTarget);
+            _graphicsDevice.Clear(Color.Transparent);
+            _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, _bloomEffect);
+            _bloomEffect.CurrentTechnique = _bloomEffect.Techniques["ExtractBright"];
+            _bloomEffect.Parameters["ScreenTexture"].SetValue(_gameRenderTarget);
+            _spriteBatch.Draw(_gameRenderTarget, Vector2.Zero, Color.White);
+            _spriteBatch.End();
+
+            _graphicsDevice.SetRenderTarget(_bloomBlurHTarget);
+            _graphicsDevice.Clear(Color.Transparent);
+            _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, _bloomEffect);
+            _bloomEffect.CurrentTechnique = _bloomEffect.Techniques["BlurHorizontal"];
+            _bloomEffect.Parameters["ScreenTexture"].SetValue(_bloomExtractTarget);
+            _spriteBatch.Draw(_bloomExtractTarget, Vector2.Zero, Color.White);
+            _spriteBatch.End();
+
+            _graphicsDevice.SetRenderTarget(_bloomBlurVTarget);
+            _graphicsDevice.Clear(Color.Transparent);
+            _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, _bloomEffect);
+            _bloomEffect.CurrentTechnique = _bloomEffect.Techniques["BlurVertical"];
+            _bloomEffect.Parameters["ScreenTexture"].SetValue(_bloomBlurHTarget);
+            _spriteBatch.Draw(_bloomBlurHTarget, Vector2.Zero, Color.White);
             _spriteBatch.End();
 
             _graphicsDevice.SetRenderTarget(null);
@@ -52,16 +89,18 @@ namespace Snow.Engine
         public void DrawFinal()
         {
             _graphicsDevice.Clear(Color.Black);
-
             Rectangle destRect = GetScaledDestinationRectangle();
 
             _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp);
             _spriteBatch.Draw(_gameRenderTarget, destRect, CanvasModulate);
             _spriteBatch.End();
 
-            _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Additive, SamplerState.PointClamp);
-            _spriteBatch.Draw(_bloomRenderTarget, destRect, Color.White);
-            _spriteBatch.End();
+            if (_bloomBlurVTarget != null)
+            {
+                _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Additive, SamplerState.PointClamp);
+                _spriteBatch.Draw(_bloomBlurVTarget, destRect, Color.White);
+                _spriteBatch.End();
+            }
         }
 
         private Rectangle GetScaledDestinationRectangle()
@@ -85,14 +124,10 @@ namespace Snow.Engine
         public void Dispose()
         {
             _gameRenderTarget?.Dispose();
-            _bloomRenderTarget?.Dispose();
+            _bloomExtractTarget?.Dispose();
+            _bloomBlurHTarget?.Dispose();
+            _bloomBlurVTarget?.Dispose();
             _spriteBatch?.Dispose();
         }
     }
 }
-
-
-
-
-
-
