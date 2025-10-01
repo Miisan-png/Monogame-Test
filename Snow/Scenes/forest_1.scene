@@ -2,70 +2,23 @@
 name = "Forest Level 1 Enhanced"
 tilemap = "levels/lvl.json"
 tileset = "assets/world_tileset.png"
-background_color = #1a1a2eff
+background_color = #000000ff
 music = "assets/audio/forest_ambient.ogg"
 gravity = 1400
 
+[camera]
+room_width = 320
+room_height = 180
+follow_mode = "room"
+smooth_speed = 10
+
 [entity id="playerspawn_1"]
 type = "PlayerSpawn"
-position = 477.29933333333327, 134.84133333333335
-
-[light id="torch_1"]
-position = 160.0, 80.0
-radius = 80.0
-color = #ff8844
-intensity = 2.0
-type = "point"
+position = 143.3, 80.9
 
 [light id="moonlight"]
-position = 160.0, 0.0
-radius = 200.0
-color = #6699ff
+position = 160, 0
+radius = 200
+color = #8cff80ff
 intensity = 0.8
 type = "ambient"
-
-[audio id="river_ambient"]
-position = 100.0, 90.0
-audio_file = "assets/audio/river.ogg"
-volume = 0.6
-loop = true
-autoplay = true
-min_distance = 50.0
-max_distance = 200.0
-
-[trigger id="level_exit"]
-position = 300.0, 100.0
-size = 32.0, 32.0
-trigger_type = "level_transition"
-action = "load_scene"
-
-[trigger id="checkpoint_1"]
-position = 150.0, 100.0
-size = 16.0, 32.0
-trigger_type = "checkpoint"
-action = "save_progress"
-
-[spawn_point id="enemy_spawn_1"]
-position = 250.0, 90.0
-entity_type = "Slime"
-spawn_delay = 5.0
-max_spawns = 3
-
-[spawn_point id="coin_spawn_1"]
-position = 180.0, 70.0
-entity_type = "Coin"
-spawn_delay = 10.0
-max_spawns = -1
-
-[particle_emitter id="fireflies_1"]
-position = 150.0, 60.0
-type = "ambient"
-particle_texture = "assets/particles/glow.png"
-emission_rate = 3
-
-[particle_emitter id="waterfall_1"]
-position = 100.0, 40.0
-type = "waterfall"
-particle_texture = "assets/particles/water.png"
-emission_rate = 15
-
