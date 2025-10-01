@@ -29,7 +29,7 @@ namespace Snow
         private float _physicsParticleSpawnTimer;
         private KeyboardState _previousKeyboard;
         
-        private Color _canvasModulate = new Color(0.7f, 0.9f, 1.0f, 1.0f);
+        private Color _canvasModulate = new Color(0xc5, 0x00, 0xa8, 0xff);
 
         public Game1()
         {
@@ -138,29 +138,29 @@ namespace Snow
         {
             Color[] pastelColors = new Color[]
             {
-                new Color(255, 200, 220),
-                new Color(200, 220, 255),
-                new Color(220, 255, 200),
-                new Color(255, 240, 200),
-                new Color(240, 200, 255),
-                new Color(200, 255, 240),
-                new Color(255, 220, 200),
-                new Color(220, 200, 255)
+                new Color(255, 100, 150),
+                new Color(100, 150, 255),
+                new Color(150, 255, 100),
+                new Color(255, 200, 100),
+                new Color(200, 100, 255),
+                new Color(100, 255, 200),
+                new Color(255, 150, 100),
+                new Color(150, 100, 255)
             };
 
-            for (int i = 0; i < 50; i++)
+            for (int i = 0; i < 20; i++)
             {
                 float x = (float)_random.NextDouble() * 320f;
                 float y = (float)_random.NextDouble() * 180f;
                 Vector2 pos = new Vector2(x, y);
                 Vector2 vel = new Vector2(
-                    (float)(_random.NextDouble() - 0.5) * 10f,
-                    (float)(_random.NextDouble() - 0.5) * 10f
+                    (float)(_random.NextDouble() - 0.5) * 12f,
+                    (float)(_random.NextDouble() - 0.5) * 12f
                 );
                 
                 Color color = pastelColors[_random.Next(pastelColors.Length)];
                 
-                _particles.EmitPhysicsParticle(pos, vel, color, 0.5f, 0.2f);
+                _particles.EmitPhysicsParticle(pos, vel, color, 0.6f, 0.2f);
             }
         }
 
@@ -213,31 +213,31 @@ namespace Snow
             }
 
             _physicsParticleSpawnTimer += deltaTime;
-            if (_physicsParticleSpawnTimer > 4f && _particles.GetPhysicsParticleCount() < 50)
+            if (_physicsParticleSpawnTimer > 6f && _particles.GetPhysicsParticleCount() < 20)
             {
                 Color[] pastelColors = new Color[]
                 {
-                    new Color(255, 200, 220),
-                    new Color(200, 220, 255),
-                    new Color(220, 255, 200),
-                    new Color(255, 240, 200),
-                    new Color(240, 200, 255),
-                    new Color(200, 255, 240),
-                    new Color(255, 220, 200),
-                    new Color(220, 200, 255)
+                    new Color(255, 100, 150),
+                    new Color(100, 150, 255),
+                    new Color(150, 255, 100),
+                    new Color(255, 200, 100),
+                    new Color(200, 100, 255),
+                    new Color(100, 255, 200),
+                    new Color(255, 150, 100),
+                    new Color(150, 100, 255)
                 };
 
                 float x = (float)_random.NextDouble() * 320f;
                 float y = (float)_random.NextDouble() < 0.5f ? -10f : 190f;
                 Vector2 pos = new Vector2(x, y);
                 Vector2 vel = new Vector2(
-                    (float)(_random.NextDouble() - 0.5) * 8f,
-                    y < 0 ? (float)_random.NextDouble() * 10f + 3f : -(float)_random.NextDouble() * 10f - 3f
+                    (float)(_random.NextDouble() - 0.5) * 10f,
+                    y < 0 ? (float)_random.NextDouble() * 12f + 4f : -(float)_random.NextDouble() * 12f - 4f
                 );
                 
                 Color color = pastelColors[_random.Next(pastelColors.Length)];
                 
-                _particles.EmitPhysicsParticle(pos, vel, color, 0.5f, 0.2f);
+                _particles.EmitPhysicsParticle(pos, vel, color, 0.6f, 0.2f);
                 _physicsParticleSpawnTimer = 0f;
             }
             
@@ -336,9 +336,9 @@ namespace Snow
 
             if (keyboard.IsKeyDown(Keys.R) && !_previousKeyboard.IsKeyDown(Keys.R))
             {
-                _postProcessing.BloomThreshold = 0.6f;
-                _postProcessing.BloomIntensity = 0.8f;
-                _canvasModulate = new Color(0.7f, 0.9f, 1.0f, 1.0f);
+                _postProcessing.BloomThreshold = 0.5f;
+                _postProcessing.BloomIntensity = 0.7f;
+                _canvasModulate = new Color(0xc5, 0x00, 0xa8, 0xff);
                 _console.LogSuccess("Reset to defaults!");
             }
         }

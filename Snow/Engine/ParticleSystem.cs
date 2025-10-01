@@ -57,9 +57,9 @@ namespace Snow.Engine
                 _physicsParticles[i] = new PhysicsParticle
                 {
                     Mass = 1f,
-                    Drag = 0.98f,
-                    Bounciness = 0.6f,
-                    GlowIntensity = 1f,
+                    Drag = 0.99f,
+                    Bounciness = 0.9f,
+                    GlowIntensity = 2.5f,
                     PulseSpeed = 1f
                 };
             }
@@ -93,9 +93,9 @@ namespace Snow.Engine
                     _physicsParticles[i].Size = size;
                     _physicsParticles[i].Mass = mass;
                     _physicsParticles[i].Active = true;
-                    _physicsParticles[i].GlowIntensity = 1.5f;
+                    _physicsParticles[i].GlowIntensity = 1.2f + (float)_random.NextDouble() * 0.6f;
                     _physicsParticles[i].PulseTimer = (float)_random.NextDouble() * MathHelper.TwoPi;
-                    _physicsParticles[i].PulseSpeed = 0.5f + (float)_random.NextDouble() * 1.5f;
+                    _physicsParticles[i].PulseSpeed = 0.3f + (float)_random.NextDouble() * 1.0f;
                     _physicsParticleCount++;
                     break;
                 }
@@ -372,10 +372,10 @@ namespace Snow.Engine
                 if (_physicsParticles[i].Active)
                 {
                     var p = _physicsParticles[i];
-                    float pulse = (float)Math.Sin(p.PulseTimer) * 0.4f + 1.0f;
-                    Color glowColor = p.Color * p.GlowIntensity * pulse * 0.8f;
+                    float pulse = (float)Math.Sin(p.PulseTimer) * 0.3f + 0.7f;
+                    Color glowColor = p.Color * p.GlowIntensity * pulse * 0.5f;
 
-                    float glowScale = p.Size * 3f;
+                    float glowScale = p.Size * 2.5f;
                     spriteBatch.Draw(
                         glowTexture,
                         p.Position,

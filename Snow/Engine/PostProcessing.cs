@@ -15,8 +15,8 @@ namespace Snow.Engine
         private Effect _bloomEffect;
 
         public Color CanvasModulate { get; set; } = new Color(0.6f, 0.4f, 0.9f, 1.0f);
-        public float BloomThreshold { get; set; } = 0.6f;
-        public float BloomIntensity { get; set; } = 0.8f;
+        public float BloomThreshold { get; set; } = 0.5f;
+        public float BloomIntensity { get; set; } = 0.7f;
         public int GameWidth { get; private set; }
         public int GameHeight { get; private set; }
         public bool BloomEnabled { get; set; } = true;
