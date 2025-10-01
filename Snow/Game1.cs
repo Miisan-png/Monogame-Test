@@ -22,9 +22,14 @@ namespace Snow
         private SceneManager _sceneManager;
         private CanvasUI _canvasUI;
         private Texture2D _pixel;
+        private Texture2D _glowTexture;
 
         private Random _random;
         private float _windTimer;
+        private float _physicsParticleSpawnTimer;
+        private KeyboardState _previousKeyboard;
+        
+        private Color _canvasModulate = new Color(0.7f, 0.9f, 1.0f, 1.0f);
 
         public Game1()
         {
@@ -53,6 +58,8 @@ namespace Snow
             _pixel = new Texture2D(GraphicsDevice, 1, 1);
             _pixel.SetData(new[] { Color.White });
 
+            CreateGlowTexture();
+
             _canvasUI = new CanvasUI(GraphicsDevice);
             _debugUI = new DebugUI(GraphicsDevice);
             _graphicsManager = new GraphicsManager(GraphicsDevice);
@@ -63,10 +70,17 @@ namespace Snow
             _debugOverlay = new DebugOverlay(GraphicsDevice);
             _random = new Random();
             _windTimer = 0f;
+            _physicsParticleSpawnTimer = 0f;
 
             _sceneManager = new SceneManager(GraphicsDevice, _graphicsManager);
 
             _console.Log("Snow Engine initialized");
+            _console.LogSuccess($"Bloom enabled: {_postProcessing.BloomEnabled}");
+            _console.Log("Controls:");
+            _console.Log("  Q/A - Bloom Threshold");
+            _console.Log("  W/S - Bloom Intensity");
+            _console.Log("  E/D - Canvas Modulate");
+            _console.Log("  R   - Reset to defaults");
 
             try
             {
@@ -92,18 +106,140 @@ namespace Snow
             }
             
             _debugUI.Enabled = true;
+
+            SpawnInitialFireflies();
+        }
+
+        private void CreateGlowTexture()
+        {
+            int size = 32;
+            _glowTexture = new Texture2D(GraphicsDevice, size, size);
+            Color[] glowData = new Color[size * size];
+            
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = (x - size / 2f) / (size / 2f);
+                    float dy = (y - size / 2f) / (size / 2f);
+                    float distance = (float)Math.Sqrt(dx * dx + dy * dy);
+                    
+                    float alpha = Math.Max(0, 1.0f - distance);
+                    alpha = (float)Math.Pow(alpha, 1.5f);
+                    
+                    glowData[y * size + x] = new Color(1f, 1f, 1f, alpha);
+                }
+            }
+            
+            _glowTexture.SetData(glowData);
+        }
+
+        private void SpawnInitialFireflies()
+        {
+            Color[] pastelColors = new Color[]
+            {
+                new Color(255, 200, 220),
+                new Color(200, 220, 255),
+                new Color(220, 255, 200),
+                new Color(255, 240, 200),
+                new Color(240, 200, 255),
+                new Color(200, 255, 240),
+                new Color(255, 220, 200),
+                new Color(220, 200, 255)
+            };
+
+            for (int i = 0; i < 50; i++)
+            {
+                float x = (float)_random.NextDouble() * 320f;
+                float y = (float)_random.NextDouble() * 180f;
+                Vector2 pos = new Vector2(x, y);
+                Vector2 vel = new Vector2(
+                    (float)(_random.NextDouble() - 0.5) * 10f,
+                    (float)(_random.NextDouble() - 0.5) * 10f
+                );
+                
+                Color color = pastelColors[_random.Next(pastelColors.Length)];
+                
+                _particles.EmitPhysicsParticle(pos, vel, color, 0.5f, 0.2f);
+            }
+        }
+
+        private Color ColorFromHSV(float h, float s, float v)
+        {
+            int hi = (int)(h / 60f) % 6;
+            float f = h / 60f - (int)(h / 60f);
+            
+            float p = v * (1 - s);
+            float q = v * (1 - f * s);
+            float t = v * (1 - (1 - f) * s);
+            
+            switch (hi)
+            {
+                case 0: return new Color(v, t, p);
+                case 1: return new Color(q, v, p);
+                case 2: return new Color(p, v, t);
+                case 3: return new Color(p, q, v);
+                case 4: return new Color(t, p, v);
+                default: return new Color(v, p, q);
+            }
         }
 
         protected override void Update(GameTime gameTime)
         {
             _input.Update();
+            KeyboardState keyboard = Keyboard.GetState();
 
-            if (Keyboard.GetState().IsKeyDown(Keys.Escape))
+            if (keyboard.IsKeyDown(Keys.Escape))
                 Exit();
+
+            HandleBloomControls(keyboard, gameTime);
 
             float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
             _player.Update(gameTime);
+            
+            Tilemap tilemap = _sceneManager.CurrentScene?.Tilemap;
+            Rectangle worldBounds = new Rectangle(0, 0, 320, 180);
+            _particles.Update(deltaTime, worldBounds, tilemap);
+
+            Vector2 playerCenter = _player.Position + new Vector2(8, 12);
+            float interactionRadius = 35f;
+            float interactionStrength = 300f;
+            _particles.ApplyRadialForce(playerCenter, interactionRadius, interactionStrength);
+
+            if (_player.GetPhysics().IsDashing)
+            {
+                _particles.ApplyRadialForce(playerCenter, 60f, 600f);
+            }
+
+            _physicsParticleSpawnTimer += deltaTime;
+            if (_physicsParticleSpawnTimer > 4f && _particles.GetPhysicsParticleCount() < 50)
+            {
+                Color[] pastelColors = new Color[]
+                {
+                    new Color(255, 200, 220),
+                    new Color(200, 220, 255),
+                    new Color(220, 255, 200),
+                    new Color(255, 240, 200),
+                    new Color(240, 200, 255),
+                    new Color(200, 255, 240),
+                    new Color(255, 220, 200),
+                    new Color(220, 200, 255)
+                };
+
+                float x = (float)_random.NextDouble() * 320f;
+                float y = (float)_random.NextDouble() < 0.5f ? -10f : 190f;
+                Vector2 pos = new Vector2(x, y);
+                Vector2 vel = new Vector2(
+                    (float)(_random.NextDouble() - 0.5) * 8f,
+                    y < 0 ? (float)_random.NextDouble() * 10f + 3f : -(float)_random.NextDouble() * 10f - 3f
+                );
+                
+                Color color = pastelColors[_random.Next(pastelColors.Length)];
+                
+                _particles.EmitPhysicsParticle(pos, vel, color, 0.5f, 0.2f);
+                _physicsParticleSpawnTimer = 0f;
+            }
             
             if (_sceneManager.CurrentScene != null)
             {
@@ -138,11 +274,73 @@ namespace Snow
 
             _camera.Follow(_player.Position);
             _camera.Update(deltaTime);
-            _particles.Update(deltaTime);
             _debugUI.Update(gameTime);
             _canvasUI.Update(gameTime);
 
+            _previousKeyboard = keyboard;
             base.Update(gameTime);
+        }
+
+        private void HandleBloomControls(KeyboardState keyboard, GameTime gameTime)
+        {
+            float adjustSpeed = (float)gameTime.ElapsedGameTime.TotalSeconds * 0.5f;
+
+            if (keyboard.IsKeyDown(Keys.Q))
+            {
+                _postProcessing.BloomThreshold += adjustSpeed;
+                _console.Log($"Bloom Threshold: {_postProcessing.BloomThreshold:F2}");
+            }
+            if (keyboard.IsKeyDown(Keys.A))
+            {
+                _postProcessing.BloomThreshold -= adjustSpeed;
+                _postProcessing.BloomThreshold = Math.Max(0f, _postProcessing.BloomThreshold);
+                _console.Log($"Bloom Threshold: {_postProcessing.BloomThreshold:F2}");
+            }
+
+            if (keyboard.IsKeyDown(Keys.W))
+            {
+                _postProcessing.BloomIntensity += adjustSpeed * 2f;
+                _console.Log($"Bloom Intensity: {_postProcessing.BloomIntensity:F2}");
+            }
+            if (keyboard.IsKeyDown(Keys.S))
+            {
+                _postProcessing.BloomIntensity -= adjustSpeed * 2f;
+                _postProcessing.BloomIntensity = Math.Max(0f, _postProcessing.BloomIntensity);
+                _console.Log($"Bloom Intensity: {_postProcessing.BloomIntensity:F2}");
+            }
+
+            if (keyboard.IsKeyDown(Keys.E))
+            {
+                float r = _canvasModulate.R / 255f + adjustSpeed;
+                float g = _canvasModulate.G / 255f + adjustSpeed;
+                float b = _canvasModulate.B / 255f + adjustSpeed;
+                _canvasModulate = new Color(
+                    Math.Min(1f, r),
+                    Math.Min(1f, g),
+                    Math.Min(1f, b)
+                );
+                _console.Log($"Canvas Modulate: R={_canvasModulate.R}, G={_canvasModulate.G}, B={_canvasModulate.B}");
+            }
+            if (keyboard.IsKeyDown(Keys.D))
+            {
+                float r = _canvasModulate.R / 255f - adjustSpeed;
+                float g = _canvasModulate.G / 255f - adjustSpeed;
+                float b = _canvasModulate.B / 255f - adjustSpeed;
+                _canvasModulate = new Color(
+                    Math.Max(0f, r),
+                    Math.Max(0f, g),
+                    Math.Max(0f, b)
+                );
+                _console.Log($"Canvas Modulate: R={_canvasModulate.R}, G={_canvasModulate.G}, B={_canvasModulate.B}");
+            }
+
+            if (keyboard.IsKeyDown(Keys.R) && !_previousKeyboard.IsKeyDown(Keys.R))
+            {
+                _postProcessing.BloomThreshold = 0.6f;
+                _postProcessing.BloomIntensity = 0.8f;
+                _canvasModulate = new Color(0.7f, 0.9f, 1.0f, 1.0f);
+                _console.LogSuccess("Reset to defaults!");
+            }
         }
 
         protected override void Draw(GameTime gameTime)
@@ -167,6 +365,8 @@ namespace Snow
 
             _graphicsManager.SpriteBatch.End();
 
+            _particles.DrawPhysicsParticlesGlow(_graphicsManager.SpriteBatch, _glowTexture, _camera.GetTransformMatrix());
+            _particles.DrawPhysicsParticles(_graphicsManager.SpriteBatch, _camera.GetTransformMatrix());
             _particles.Draw(_graphicsManager.SpriteBatch, _camera.GetTransformMatrix());
 
             _graphicsManager.SpriteBatch.Begin(
@@ -182,7 +382,7 @@ namespace Snow
             _postProcessing.EndGameRender();
 
             _postProcessing.ApplyPostProcessing();
-            _postProcessing.DrawFinal();
+            _postProcessing.DrawFinal(_canvasModulate);
 
             int entityCount = _sceneManager.CurrentScene?.Entities.Count ?? 0;
             _debugUI.Draw(_graphicsManager.SpriteBatch, _player, _camera, entityCount);
@@ -201,7 +401,9 @@ namespace Snow
             _postProcessing?.Dispose();
             _graphicsManager?.Dispose();
             _pixel?.Dispose();
+            _glowTexture?.Dispose();
             base.UnloadContent();
         }
     }
 }
+

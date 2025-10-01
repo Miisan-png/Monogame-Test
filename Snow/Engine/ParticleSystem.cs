@@ -16,11 +16,30 @@ namespace Snow.Engine
         public bool Active;
     }
 
+    public class PhysicsParticle
+    {
+        public Vector2 Position;
+        public Vector2 Velocity;
+        public Vector2 Force;
+        public Color Color;
+        public float Size;
+        public float Mass;
+        public float Drag;
+        public float Bounciness;
+        public bool Active;
+        public float GlowIntensity;
+        public float PulseTimer;
+        public float PulseSpeed;
+    }
+
     public class ParticleSystem
     {
         private Particle[] _particles;
+        private PhysicsParticle[] _physicsParticles;
         private int _particleCount;
+        private int _physicsParticleCount;
         private Texture2D _particleTexture;
+        private Texture2D _squareTexture;
         private SpriteBatch _spriteBatch;
         private Random _random;
 
@@ -32,13 +51,94 @@ namespace Snow.Engine
                 _particles[i] = new Particle();
             }
 
+            _physicsParticles = new PhysicsParticle[500];
+            for (int i = 0; i < 500; i++)
+            {
+                _physicsParticles[i] = new PhysicsParticle
+                {
+                    Mass = 1f,
+                    Drag = 0.98f,
+                    Bounciness = 0.6f,
+                    GlowIntensity = 1f,
+                    PulseSpeed = 1f
+                };
+            }
+
             _particleCount = 0;
+            _physicsParticleCount = 0;
             _random = new Random();
 
             _particleTexture = new Texture2D(graphicsDevice, 1, 1);
             _particleTexture.SetData(new[] { Color.White });
 
+            _squareTexture = new Texture2D(graphicsDevice, 4, 4);
+            Color[] squareData = new Color[16];
+            for (int i = 0; i < 16; i++)
+                squareData[i] = Color.White;
+            _squareTexture.SetData(squareData);
+
             _spriteBatch = new SpriteBatch(graphicsDevice);
+        }
+
+        public void EmitPhysicsParticle(Vector2 position, Vector2 velocity, Color color, float size, float mass = 1f)
+        {
+            for (int i = 0; i < _physicsParticles.Length; i++)
+            {
+                if (!_physicsParticles[i].Active)
+                {
+                    _physicsParticles[i].Position = position;
+                    _physicsParticles[i].Velocity = velocity;
+                    _physicsParticles[i].Force = Vector2.Zero;
+                    _physicsParticles[i].Color = color;
+                    _physicsParticles[i].Size = size;
+                    _physicsParticles[i].Mass = mass;
+                    _physicsParticles[i].Active = true;
+                    _physicsParticles[i].GlowIntensity = 1.5f;
+                    _physicsParticles[i].PulseTimer = (float)_random.NextDouble() * MathHelper.TwoPi;
+                    _physicsParticles[i].PulseSpeed = 0.5f + (float)_random.NextDouble() * 1.5f;
+                    _physicsParticleCount++;
+                    break;
+                }
+            }
+        }
+
+        public void ApplyForceToPhysicsParticles(Vector2 center, float radius, Vector2 force)
+        {
+            for (int i = 0; i < _physicsParticles.Length; i++)
+            {
+                if (_physicsParticles[i].Active)
+                {
+                    Vector2 diff = _physicsParticles[i].Position - center;
+                    float distance = diff.Length();
+                    
+                    if (distance < radius && distance > 0.1f)
+                    {
+                        float strength = 1f - (distance / radius);
+                        strength = (float)Math.Pow(strength, 2);
+                        Vector2 direction = diff / distance;
+                        _physicsParticles[i].Force += direction * force.Length() * strength;
+                    }
+                }
+            }
+        }
+
+        public void ApplyRadialForce(Vector2 center, float radius, float strength)
+        {
+            for (int i = 0; i < _physicsParticles.Length; i++)
+            {
+                if (_physicsParticles[i].Active)
+                {
+                    Vector2 diff = _physicsParticles[i].Position - center;
+                    float distance = diff.Length();
+                    
+                    if (distance < radius && distance > 0.1f)
+                    {
+                        float forceMagnitude = strength * (1f - (distance / radius));
+                        Vector2 direction = diff / distance;
+                        _physicsParticles[i].Force += direction * forceMagnitude;
+                    }
+                }
+            }
         }
 
         public void Emit(Vector2 position, Vector2 velocity, Color color, float life, float size)
@@ -86,7 +186,7 @@ namespace Snow.Engine
             }
         }
 
-        public void Update(float deltaTime)
+        public void Update(float deltaTime, Rectangle worldBounds, Tilemap tilemap = null)
         {
             for (int i = 0; i < _particles.Length; i++)
             {
@@ -102,6 +202,76 @@ namespace Snow.Engine
 
                     _particles[i].Position += _particles[i].Velocity * deltaTime;
                     _particles[i].Velocity.Y += 200f * deltaTime;
+                }
+            }
+
+            for (int i = 0; i < _physicsParticles.Length; i++)
+            {
+                if (_physicsParticles[i].Active)
+                {
+                    var p = _physicsParticles[i];
+                    
+                    p.PulseTimer += deltaTime * p.PulseSpeed;
+                    
+                    Vector2 acceleration = p.Force / p.Mass;
+                    p.Velocity += acceleration * deltaTime;
+                    p.Velocity *= p.Drag;
+                    
+                    p.Velocity.Y += 15f * deltaTime;
+                    
+                    Vector2 newPos = p.Position + p.Velocity * deltaTime;
+                    
+                    if (tilemap != null)
+                    {
+                        int tileX = (int)(newPos.X / tilemap.TileSize);
+                        int tileY = (int)(newPos.Y / tilemap.TileSize);
+                        
+                        if (tilemap.IsSolid(tileX, tileY))
+                        {
+                            int oldTileX = (int)(p.Position.X / tilemap.TileSize);
+                            int oldTileY = (int)(p.Position.Y / tilemap.TileSize);
+                            
+                            if (oldTileX != tileX)
+                            {
+                                p.Velocity.X *= -p.Bounciness;
+                                newPos.X = p.Position.X;
+                            }
+                            
+                            if (oldTileY != tileY)
+                            {
+                                p.Velocity.Y *= -p.Bounciness;
+                                newPos.Y = p.Position.Y;
+                            }
+                        }
+                    }
+                    
+                    p.Position = newPos;
+                    
+                    if (p.Position.X < worldBounds.Left)
+                    {
+                        p.Position.X = worldBounds.Left;
+                        p.Velocity.X *= -p.Bounciness;
+                    }
+                    else if (p.Position.X > worldBounds.Right)
+                    {
+                        p.Position.X = worldBounds.Right;
+                        p.Velocity.X *= -p.Bounciness;
+                    }
+                    
+                    if (p.Position.Y < worldBounds.Top)
+                    {
+                        p.Position.Y = worldBounds.Top;
+                        p.Velocity.Y *= -p.Bounciness;
+                    }
+                    else if (p.Position.Y > worldBounds.Bottom)
+                    {
+                        p.Position.Y = worldBounds.Bottom;
+                        p.Velocity.Y *= -p.Bounciness;
+                    }
+                    
+                    p.Force = Vector2.Zero;
+                    
+                    _physicsParticles[i] = p;
                 }
             }
         }
@@ -144,6 +314,99 @@ namespace Snow.Engine
             spriteBatch.End();
         }
 
+        public void DrawPhysicsParticles(SpriteBatch spriteBatch, Matrix? transformMatrix = null)
+        {
+            if (_physicsParticleCount == 0) return;
+
+            spriteBatch.Begin(
+                SpriteSortMode.Deferred,
+                BlendState.AlphaBlend,
+                SamplerState.PointClamp,
+                null,
+                null,
+                null,
+                transformMatrix
+            );
+
+            for (int i = 0; i < _physicsParticles.Length; i++)
+            {
+                if (_physicsParticles[i].Active)
+                {
+                    var p = _physicsParticles[i];
+                    float pulse = (float)Math.Sin(p.PulseTimer) * 0.3f + 0.7f;
+                    Color drawColor = p.Color * pulse;
+
+                    spriteBatch.Draw(
+                        _squareTexture,
+                        p.Position,
+                        null,
+                        drawColor,
+                        0f,
+                        new Vector2(2, 2),
+                        p.Size,
+                        SpriteEffects.None,
+                        0f
+                    );
+                }
+            }
+
+            spriteBatch.End();
+        }
+
+        public void DrawPhysicsParticlesGlow(SpriteBatch spriteBatch, Texture2D glowTexture, Matrix? transformMatrix = null)
+        {
+            if (_physicsParticleCount == 0) return;
+
+            spriteBatch.Begin(
+                SpriteSortMode.Deferred,
+                BlendState.Additive,
+                SamplerState.PointClamp,
+                null,
+                null,
+                null,
+                transformMatrix
+            );
+
+            for (int i = 0; i < _physicsParticles.Length; i++)
+            {
+                if (_physicsParticles[i].Active)
+                {
+                    var p = _physicsParticles[i];
+                    float pulse = (float)Math.Sin(p.PulseTimer) * 0.4f + 1.0f;
+                    Color glowColor = p.Color * p.GlowIntensity * pulse * 0.8f;
+
+                    float glowScale = p.Size * 3f;
+                    spriteBatch.Draw(
+                        glowTexture,
+                        p.Position,
+                        null,
+                        glowColor,
+                        0f,
+                        new Vector2(glowTexture.Width / 2, glowTexture.Height / 2),
+                        glowScale,
+                        SpriteEffects.None,
+                        0f
+                    );
+                }
+            }
+
+            spriteBatch.End();
+        }
+
+        public int GetPhysicsParticleCount()
+        {
+            return _physicsParticleCount;
+        }
+
+        public void ClearPhysicsParticles()
+        {
+            for (int i = 0; i < _physicsParticles.Length; i++)
+            {
+                _physicsParticles[i].Active = false;
+            }
+            _physicsParticleCount = 0;
+        }
+
         public void Clear()
         {
             for (int i = 0; i < _particles.Length; i++)
@@ -156,6 +419,7 @@ namespace Snow.Engine
         public void Dispose()
         {
             _particleTexture?.Dispose();
+            _squareTexture?.Dispose();
             _spriteBatch?.Dispose();
         }
     }

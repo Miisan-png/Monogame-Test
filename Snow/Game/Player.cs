@@ -166,7 +166,7 @@ namespace Snow.Game
 
             foreach (var ghost in _ghostTrails)
             {
-                Color ghostColor = new Color(255, 80, 255, (int)(ghost.Alpha * 255));
+                Color ghostColor = new Color(255, 255, 255, (int)(ghost.Alpha * 255));
                 SpriteEffects effects = ghost.FlipX ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
                 
                 spriteBatch.Draw(
@@ -182,8 +182,7 @@ namespace Snow.Game
                 );
             }
 
-            Color playerColor = new Color(255, 100, 255);
-            _sprite.Draw(spriteBatch, Position, playerColor, 1f);
+            _sprite.Draw(spriteBatch, Position, Color.White, 1f);
         }
 
         public PhysicsComponent GetPhysics()

@@ -1,5 +1,6 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using System.IO;
 
 namespace Snow.Engine
 {
@@ -12,13 +13,13 @@ namespace Snow.Engine
         private RenderTarget2D _bloomBlurVTarget;
         private SpriteBatch _spriteBatch;
         private Effect _bloomEffect;
-        private Effect _modulateEffect;
 
         public Color CanvasModulate { get; set; } = new Color(0.6f, 0.4f, 0.9f, 1.0f);
-        public float BloomThreshold { get; set; } = 0.5f;
-        public float BloomIntensity { get; set; } = 2.0f;
+        public float BloomThreshold { get; set; } = 0.6f;
+        public float BloomIntensity { get; set; } = 0.8f;
         public int GameWidth { get; private set; }
         public int GameHeight { get; private set; }
+        public bool BloomEnabled { get; set; } = true;
 
         public PostProcessing(GraphicsDevice graphicsDevice, int gameWidth, int gameHeight)
         {
@@ -31,12 +32,25 @@ namespace Snow.Engine
             _bloomBlurHTarget = new RenderTarget2D(graphicsDevice, gameWidth, gameHeight);
             _bloomBlurVTarget = new RenderTarget2D(graphicsDevice, gameWidth, gameHeight);
             _spriteBatch = new SpriteBatch(graphicsDevice);
+
+            LoadShaders();
         }
 
-        public void LoadShaders(Effect bloomEffect, Effect modulateEffect)
+        private void LoadShaders()
         {
-            _bloomEffect = bloomEffect;
-            _modulateEffect = modulateEffect;
+            try
+            {
+                string shaderPath = "Snow/Shaders/Bloom.fx";
+                if (File.Exists(shaderPath))
+                {
+                    byte[] shaderBytes = File.ReadAllBytes(shaderPath);
+                    _bloomEffect = new Effect(_graphicsDevice, shaderBytes);
+                }
+            }
+            catch
+            {
+                BloomEnabled = false;
+            }
         }
 
         public void BeginGameRender()
@@ -52,18 +66,18 @@ namespace Snow.Engine
 
         public void ApplyPostProcessing()
         {
-            if (_bloomEffect == null || _modulateEffect == null)
+            if (!BloomEnabled || _bloomEffect == null)
                 return;
 
-            _bloomEffect.Parameters["BloomThreshold"].SetValue(BloomThreshold);
-            _bloomEffect.Parameters["BloomIntensity"].SetValue(BloomIntensity);
-            _bloomEffect.Parameters["TextureSize"].SetValue(new Vector2(GameWidth, GameHeight));
+            _bloomEffect.Parameters["BloomThreshold"]?.SetValue(BloomThreshold);
+            _bloomEffect.Parameters["BloomIntensity"]?.SetValue(BloomIntensity);
+            _bloomEffect.Parameters["TextureSize"]?.SetValue(new Vector2(GameWidth, GameHeight));
 
             _graphicsDevice.SetRenderTarget(_bloomExtractTarget);
             _graphicsDevice.Clear(Color.Transparent);
             _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, _bloomEffect);
             _bloomEffect.CurrentTechnique = _bloomEffect.Techniques["ExtractBright"];
-            _bloomEffect.Parameters["ScreenTexture"].SetValue(_gameRenderTarget);
+            _bloomEffect.Parameters["ScreenTexture"]?.SetValue(_gameRenderTarget);
             _spriteBatch.Draw(_gameRenderTarget, Vector2.Zero, Color.White);
             _spriteBatch.End();
 
@@ -71,7 +85,7 @@ namespace Snow.Engine
             _graphicsDevice.Clear(Color.Transparent);
             _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, _bloomEffect);
             _bloomEffect.CurrentTechnique = _bloomEffect.Techniques["BlurHorizontal"];
-            _bloomEffect.Parameters["ScreenTexture"].SetValue(_bloomExtractTarget);
+            _bloomEffect.Parameters["ScreenTexture"]?.SetValue(_bloomExtractTarget);
             _spriteBatch.Draw(_bloomExtractTarget, Vector2.Zero, Color.White);
             _spriteBatch.End();
 
@@ -79,23 +93,25 @@ namespace Snow.Engine
             _graphicsDevice.Clear(Color.Transparent);
             _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, _bloomEffect);
             _bloomEffect.CurrentTechnique = _bloomEffect.Techniques["BlurVertical"];
-            _bloomEffect.Parameters["ScreenTexture"].SetValue(_bloomBlurHTarget);
+            _bloomEffect.Parameters["ScreenTexture"]?.SetValue(_bloomBlurHTarget);
             _spriteBatch.Draw(_bloomBlurHTarget, Vector2.Zero, Color.White);
             _spriteBatch.End();
 
             _graphicsDevice.SetRenderTarget(null);
         }
 
-        public void DrawFinal()
+        public void DrawFinal(Color? canvasModulate = null)
         {
             _graphicsDevice.Clear(Color.Black);
             Rectangle destRect = GetScaledDestinationRectangle();
 
+            Color modColor = canvasModulate ?? Color.White;
+
             _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp);
-            _spriteBatch.Draw(_gameRenderTarget, destRect, CanvasModulate);
+            _spriteBatch.Draw(_gameRenderTarget, destRect, modColor);
             _spriteBatch.End();
 
-            if (_bloomBlurVTarget != null)
+            if (BloomEnabled && _bloomBlurVTarget != null)
             {
                 _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Additive, SamplerState.PointClamp);
                 _spriteBatch.Draw(_bloomBlurVTarget, destRect, Color.White);
@@ -128,6 +144,7 @@ namespace Snow.Engine
             _bloomBlurHTarget?.Dispose();
             _bloomBlurVTarget?.Dispose();
             _spriteBatch?.Dispose();
+            _bloomEffect?.Dispose();
         }
     }
 }
