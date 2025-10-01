@@ -13,11 +13,22 @@ namespace Snow.Engine
         public string BackgroundColor { get; set; }
         public List<EntityData> Entities { get; set; }
         public List<ParticleEmitterData> ParticleEmitters { get; set; }
+        public List<LightData> Lights { get; set; }
+        public List<AudioSourceData> AudioSources { get; set; }
+        public CameraSettingsData CameraSettings { get; set; }
+        public Dictionary<string, object> Properties { get; set; }
+        public List<TriggerData> Triggers { get; set; }
+        public List<SpawnPointData> SpawnPoints { get; set; }
 
         public SceneData()
         {
             Entities = new List<EntityData>();
             ParticleEmitters = new List<ParticleEmitterData>();
+            Lights = new List<LightData>();
+            AudioSources = new List<AudioSourceData>();
+            Triggers = new List<TriggerData>();
+            SpawnPoints = new List<SpawnPointData>();
+            Properties = new Dictionary<string, object>();
         }
     }
 
@@ -54,6 +65,104 @@ namespace Snow.Engine
         }
     }
 
+    public class LightData
+    {
+        public string Id { get; set; }
+        public float X { get; set; }
+        public float Y { get; set; }
+        public float Radius { get; set; }
+        public string Color { get; set; }
+        public float Intensity { get; set; }
+        public string Type { get; set; }
+        public Dictionary<string, object> Properties { get; set; }
+
+        public LightData()
+        {
+            Properties = new Dictionary<string, object>();
+            Type = "point";
+            Intensity = 1.0f;
+        }
+    }
+
+    public class AudioSourceData
+    {
+        public string Id { get; set; }
+        public float X { get; set; }
+        public float Y { get; set; }
+        public string AudioFile { get; set; }
+        public float Volume { get; set; }
+        public bool Loop { get; set; }
+        public bool AutoPlay { get; set; }
+        public float MinDistance { get; set; }
+        public float MaxDistance { get; set; }
+        public Dictionary<string, object> Properties { get; set; }
+
+        public AudioSourceData()
+        {
+            Properties = new Dictionary<string, object>();
+            Volume = 1.0f;
+            Loop = false;
+            AutoPlay = false;
+            MinDistance = 50f;
+            MaxDistance = 300f;
+        }
+    }
+
+    public class CameraSettingsData
+    {
+        public int RoomWidth { get; set; }
+        public int RoomHeight { get; set; }
+        public string FollowMode { get; set; }
+        public float SmoothSpeed { get; set; }
+        public Dictionary<string, object> Properties { get; set; }
+
+        public CameraSettingsData()
+        {
+            Properties = new Dictionary<string, object>();
+            RoomWidth = 320;
+            RoomHeight = 180;
+            FollowMode = "room";
+            SmoothSpeed = 0f;
+        }
+    }
+
+    public class TriggerData
+    {
+        public string Id { get; set; }
+        public float X { get; set; }
+        public float Y { get; set; }
+        public float Width { get; set; }
+        public float Height { get; set; }
+        public string TriggerType { get; set; }
+        public string Action { get; set; }
+        public Dictionary<string, object> Properties { get; set; }
+
+        public TriggerData()
+        {
+            Properties = new Dictionary<string, object>();
+            Width = 32f;
+            Height = 32f;
+        }
+    }
+
+    public class SpawnPointData
+    {
+        public string Id { get; set; }
+        public float X { get; set; }
+        public float Y { get; set; }
+        public string EntityType { get; set; }
+        public float SpawnDelay { get; set; }
+        public int MaxSpawns { get; set; }
+        public Dictionary<string, object> Properties { get; set; }
+
+        public SpawnPointData()
+        {
+            Properties = new Dictionary<string, object>();
+            SpawnDelay = 0f;
+            MaxSpawns = -1;
+        }
+    }
+
     public static class SceneParser
     {
         public static SceneData ParseScene(string filePath)
@@ -67,10 +176,7 @@ namespace Snow.Engine
             var lines = File.ReadAllLines(filePath);
             
             string currentSection = null;
-            EntityData currentEntity = null;
-            ParticleEmitterData currentEmitter = null;
-            Dictionary<string, List<string>> currentAnimations = null;
-            Dictionary<string, object> currentProperties = null;
+            object currentObject = null;
 
             for (int i = 0; i < lines.Length; i++)
             {
@@ -81,64 +187,66 @@ namespace Snow.Engine
 
                 if (line.StartsWith("[") && line.EndsWith("]"))
                 {
-                    if (currentEntity != null)
-                    {
-                        sceneData.Entities.Add(currentEntity);
-                        currentEntity = null;
-                    }
-                    if (currentEmitter != null)
-                    {
-                        sceneData.ParticleEmitters.Add(currentEmitter);
-                        currentEmitter = null;
-                    }
-
+                    AddCurrentObject(sceneData, currentSection, currentObject);
                     currentSection = line.Substring(1, line.Length - 2);
-                    
-                    if (currentSection.StartsWith("entity"))
-                    {
-                        currentEntity = new EntityData();
-                        var idPart = ExtractAttribute(currentSection, "id");
-                        if (idPart != null)
-                            currentEntity.Id = idPart;
-                    }
-                    else if (currentSection.StartsWith("particle_emitter"))
-                    {
-                        currentEmitter = new ParticleEmitterData();
-                        var idPart = ExtractAttribute(currentSection, "id");
-                        if (idPart != null)
-                            currentEmitter.Id = idPart;
-                    }
-
+                    currentObject = CreateObject(currentSection);
                     continue;
                 }
 
-                if (line.Contains("="))
+                if (line.Contains("=") && currentObject != null)
                 {
                     var parts = line.Split(new[] { '=' }, 2);
                     string key = parts[0].Trim();
                     string value = parts[1].Trim();
-
-                    if (currentSection == "scene")
-                    {
-                        ParseSceneProperty(sceneData, key, value);
-                    }
-                    else if (currentEntity != null)
-                    {
-                        ParseEntityProperty(currentEntity, key, value, ref currentAnimations, ref currentProperties);
-                    }
-                    else if (currentEmitter != null)
-                    {
-                        ParseEmitterProperty(currentEmitter, key, value, ref currentProperties);
-                    }
+                    SetProperty(currentObject, currentSection, key, value);
+                }
+                else if (currentSection == "scene" && line.Contains("="))
+                {
+                    var parts = line.Split(new[] { '=' }, 2);
+                    string key = parts[0].Trim();
+                    string value = parts[1].Trim();
+                    ParseSceneProperty(sceneData, key, value);
                 }
             }
 
-            if (currentEntity != null)
-                sceneData.Entities.Add(currentEntity);
-            if (currentEmitter != null)
-                sceneData.ParticleEmitters.Add(currentEmitter);
-
+            AddCurrentObject(sceneData, currentSection, currentObject);
             return sceneData;
+        }
+
+        private static object CreateObject(string section)
+        {
+            if (section.StartsWith("entity")) return new EntityData { Id = ExtractId(section) };
+            if (section.StartsWith("particle_emitter")) return new ParticleEmitterData { Id = ExtractId(section) };
+            if (section.StartsWith("light")) return new LightData { Id = ExtractId(section) };
+            if (section.StartsWith("audio")) return new AudioSourceData { Id = ExtractId(section) };
+            if (section.StartsWith("trigger")) return new TriggerData { Id = ExtractId(section) };
+            if (section.StartsWith("spawn_point")) return new SpawnPointData { Id = ExtractId(section) };
+            if (section == "camera") return new CameraSettingsData();
+            return null;
+        }
+
+        private static void AddCurrentObject(SceneData sceneData, string section, object obj)
+        {
+            if (obj == null) return;
+
+            if (obj is EntityData entity) sceneData.Entities.Add(entity);
+            else if (obj is ParticleEmitterData emitter) sceneData.ParticleEmitters.Add(emitter);
+            else if (obj is LightData light) sceneData.Lights.Add(light);
+            else if (obj is AudioSourceData audio) sceneData.AudioSources.Add(audio);
+            else if (obj is TriggerData trigger) sceneData.Triggers.Add(trigger);
+            else if (obj is SpawnPointData spawn) sceneData.SpawnPoints.Add(spawn);
+            else if (obj is CameraSettingsData camera) sceneData.CameraSettings = camera;
+        }
+
+        private static void SetProperty(object obj, string section, string key, string value)
+        {
+            if (obj is EntityData entity) ParseEntityProperty(entity, key, value);
+            else if (obj is ParticleEmitterData emitter) ParseEmitterProperty(emitter, key, value);
+            else if (obj is LightData light) ParseLightProperty(light, key, value);
+            else if (obj is AudioSourceData audio) ParseAudioProperty(audio, key, value);
+            else if (obj is TriggerData trigger) ParseTriggerProperty(trigger, key, value);
+            else if (obj is SpawnPointData spawn) ParseSpawnPointProperty(spawn, key, value);
+            else if (obj is CameraSettingsData camera) ParseCameraProperty(camera, key, value);
         }
 
         private static void ParseSceneProperty(SceneData scene, string key, string value)
@@ -147,49 +255,37 @@ namespace Snow.Engine
             
             switch (key)
             {
-                case "name":
-                    scene.Name = value;
-                    break;
-                case "tilemap":
-                    scene.Tilemap = value;
-                    break;
-                case "tileset":
-                    scene.Tileset = value;
-                    break;
-                case "background_color":
-                    scene.BackgroundColor = value;
+                case "name": scene.Name = value; break;
+                case "tilemap": scene.Tilemap = value; break;
+                case "tileset": scene.Tileset = value; break;
+                case "background_color": scene.BackgroundColor = value; break;
+                default:
+                    if (value.StartsWith("{"))
+                        scene.Properties[key] = ParseProperties(value);
+                    else
+                        scene.Properties[key] = ParseValue(value);
                     break;
             }
         }
 
-        private static void ParseEntityProperty(EntityData entity, string key, string value, 
-            ref Dictionary<string, List<string>> currentAnimations,
-            ref Dictionary<string, object> currentProperties)
+        private static void ParseEntityProperty(EntityData entity, string key, string value)
         {
             switch (key)
             {
-                case "type":
-                    entity.Type = value.Trim('"');
-                    break;
-                case "sprite":
-                    entity.Sprite = value.Trim('"');
-                    break;
+                case "type": entity.Type = value.Trim('"'); break;
+                case "sprite": entity.Sprite = value.Trim('"'); break;
                 case "position":
                     var pos = ParseVector2(value);
                     entity.X = pos.Item1;
                     entity.Y = pos.Item2;
                     break;
-                case "animations":
-                    entity.Animations = ParseDictionary(value);
-                    break;
-                case "properties":
-                    entity.Properties = ParseProperties(value);
-                    break;
+                case "animations": entity.Animations = ParseDictionary(value); break;
+                case "properties": entity.Properties = ParseProperties(value); break;
+                default: entity.Properties[key] = ParseValue(value); break;
             }
         }
 
-        private static void ParseEmitterProperty(ParticleEmitterData emitter, string key, string value,
-            ref Dictionary<string, object> currentProperties)
+        private static void ParseEmitterProperty(ParticleEmitterData emitter, string key, string value)
         {
             switch (key)
             {
@@ -198,18 +294,102 @@ namespace Snow.Engine
                     emitter.X = pos.Item1;
                     emitter.Y = pos.Item2;
                     break;
-                case "type":
-                    emitter.Type = value.Trim('"');
+                case "type": emitter.Type = value.Trim('"'); break;
+                case "particle_texture": emitter.ParticleTexture = value.Trim('"'); break;
+                case "emission_rate": emitter.EmissionRate = int.Parse(value); break;
+                case "properties": emitter.Properties = ParseProperties(value); break;
+                default: emitter.Properties[key] = ParseValue(value); break;
+            }
+        }
+
+        private static void ParseLightProperty(LightData light, string key, string value)
+        {
+            switch (key)
+            {
+                case "position":
+                    var pos = ParseVector2(value);
+                    light.X = pos.Item1;
+                    light.Y = pos.Item2;
                     break;
-                case "particle_texture":
-                    emitter.ParticleTexture = value.Trim('"');
+                case "radius": light.Radius = float.Parse(value); break;
+                case "color": light.Color = value.Trim('"'); break;
+                case "intensity": light.Intensity = float.Parse(value); break;
+                case "type": light.Type = value.Trim('"'); break;
+                case "properties": light.Properties = ParseProperties(value); break;
+                default: light.Properties[key] = ParseValue(value); break;
+            }
+        }
+
+        private static void ParseAudioProperty(AudioSourceData audio, string key, string value)
+        {
+            switch (key)
+            {
+                case "position":
+                    var pos = ParseVector2(value);
+                    audio.X = pos.Item1;
+                    audio.Y = pos.Item2;
                     break;
-                case "emission_rate":
-                    emitter.EmissionRate = int.Parse(value);
+                case "audio_file": audio.AudioFile = value.Trim('"'); break;
+                case "volume": audio.Volume = float.Parse(value); break;
+                case "loop": audio.Loop = bool.Parse(value); break;
+                case "autoplay": audio.AutoPlay = bool.Parse(value); break;
+                case "min_distance": audio.MinDistance = float.Parse(value); break;
+                case "max_distance": audio.MaxDistance = float.Parse(value); break;
+                case "properties": audio.Properties = ParseProperties(value); break;
+                default: audio.Properties[key] = ParseValue(value); break;
+            }
+        }
+
+        private static void ParseTriggerProperty(TriggerData trigger, string key, string value)
+        {
+            switch (key)
+            {
+                case "position":
+                    var pos = ParseVector2(value);
+                    trigger.X = pos.Item1;
+                    trigger.Y = pos.Item2;
                     break;
-                case "properties":
-                    emitter.Properties = ParseProperties(value);
+                case "size":
+                    var size = ParseVector2(value);
+                    trigger.Width = size.Item1;
+                    trigger.Height = size.Item2;
                     break;
+                case "width": trigger.Width = float.Parse(value); break;
+                case "height": trigger.Height = float.Parse(value); break;
+                case "trigger_type": trigger.TriggerType = value.Trim('"'); break;
+                case "action": trigger.Action = value.Trim('"'); break;
+                case "properties": trigger.Properties = ParseProperties(value); break;
+                default: trigger.Properties[key] = ParseValue(value); break;
+            }
+        }
+
+        private static void ParseSpawnPointProperty(SpawnPointData spawn, string key, string value)
+        {
+            switch (key)
+            {
+                case "position":
+                    var pos = ParseVector2(value);
+                    spawn.X = pos.Item1;
+                    spawn.Y = pos.Item2;
+                    break;
+                case "entity_type": spawn.EntityType = value.Trim('"'); break;
+                case "spawn_delay": spawn.SpawnDelay = float.Parse(value); break;
+                case "max_spawns": spawn.MaxSpawns = int.Parse(value); break;
+                case "properties": spawn.Properties = ParseProperties(value); break;
+                default: spawn.Properties[key] = ParseValue(value); break;
+            }
+        }
+
+        private static void ParseCameraProperty(CameraSettingsData camera, string key, string value)
+        {
+            switch (key)
+            {
+                case "room_width": camera.RoomWidth = int.Parse(value); break;
+                case "room_height": camera.RoomHeight = int.Parse(value); break;
+                case "follow_mode": camera.FollowMode = value.Trim('"'); break;
+                case "smooth_speed": camera.SmoothSpeed = float.Parse(value); break;
+                case "properties": camera.Properties = ParseProperties(value); break;
+                default: camera.Properties[key] = ParseValue(value); break;
             }
         }
 
@@ -327,33 +507,39 @@ namespace Snow.Engine
                 if (colonIndex > 0)
                 {
                     var key = token.Substring(0, colonIndex).Trim().Trim('"');
-                    var val = token.Substring(colonIndex + 1).Trim().Trim('"');
-                    
-                    if (int.TryParse(val, out int intVal))
-                        result[key] = intVal;
-                    else if (float.TryParse(val, out float floatVal))
-                        result[key] = floatVal;
-                    else if (bool.TryParse(val, out bool boolVal))
-                        result[key] = boolVal;
-                    else
-                        result[key] = val;
+                    var val = token.Substring(colonIndex + 1).Trim();
+                    result[key] = ParseValue(val);
                 }
             }
 
             return result;
         }
 
-        private static string ExtractAttribute(string section, string attribute)
+        private static object ParseValue(string value)
         {
-            var startIndex = section.IndexOf(attribute + "=\"");
-            if (startIndex == -1)
-                return null;
+            value = value.Trim('"');
             
-            startIndex += attribute.Length + 2;
+            if (int.TryParse(value, out int intVal))
+                return intVal;
+            else if (float.TryParse(value, out float floatVal))
+                return floatVal;
+            else if (bool.TryParse(value, out bool boolVal))
+                return boolVal;
+            else
+                return value;
+        }
+
+        private static string ExtractId(string section)
+        {
+            var startIndex = section.IndexOf("id=\"");
+            if (startIndex == -1)
+                return Guid.NewGuid().ToString();
+            
+            startIndex += 4;
             var endIndex = section.IndexOf("\"", startIndex);
             
             if (endIndex == -1)
-                return null;
+                return Guid.NewGuid().ToString();
             
             return section.Substring(startIndex, endIndex - startIndex);
         }
