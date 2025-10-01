@@ -1,0 +1,54 @@
+[scene]
+name = "Forest Level 1"
+tilemap = "levels/lvl.json"
+tileset = "assets/world_tileset.png"
+background_color = #000000ff
+
+[entity id="player_spawn"]
+type = "PlayerSpawn"
+position = 160, 130
+
+[entity id="slime_1"]
+type = "Slime"
+position = 300, 160
+properties = {
+    "patrol_distance": 50,
+    "speed": 30
+}
+
+[entity id="slime_2"]
+type = "Slime"
+position = 450, 160
+properties = {
+    "patrol_distance": 80,
+    "speed": 20
+}
+
+[entity id="coin_1"]
+type = "Coin"
+position = 250, 140
+properties = {
+    "value": 10
+}
+
+[entity id="coin_2"]
+type = "Coin"
+position = 280, 140
+properties = {
+    "value": 10
+}
+
+[entity id="coin_3"]
+type = "Coin"
+position = 310, 140
+properties = {
+    "value": 10
+}
+
+[entity id="chest_1"]
+type = "Chest"
+position = 400, 150
+
+[entity id="spike_1"]
+type = "Spike"
+position = 500, 176
