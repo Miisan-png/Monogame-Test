@@ -9,6 +9,8 @@ namespace Snow
 {
     public class Game1 : Microsoft.Xna.Framework.Game
     {
+        private const bool FULLSCREEN_ENABLED = true;
+
         private GraphicsDeviceManager _graphics;
         private GraphicsManager _graphicsManager;
         private InputManager _input;
@@ -24,6 +26,7 @@ namespace Snow
         private Texture2D _pixel;
         private Texture2D _glowTexture;
         private TransitionManager _transitionManager;
+        private MainMenu _mainMenu;
 
         private Random _random;
         private float _windTimer;
@@ -31,6 +34,7 @@ namespace Snow
         private KeyboardState _previousKeyboard;
         
         private Color _canvasModulate = new Color(0xc5, 0x00, 0xa8, 0xff);
+        private bool _gameStarted = false;
 
         public Game1()
         {
@@ -41,7 +45,7 @@ namespace Snow
 
         protected override void Initialize()
         {
-            _graphics.IsFullScreen = false;
+            _graphics.IsFullScreen = FULLSCREEN_ENABLED;
             _graphics.PreferredBackBufferWidth = 1280;
             _graphics.PreferredBackBufferHeight = 720;
             _graphics.ApplyChanges();
@@ -84,6 +88,13 @@ namespace Snow
             _console.Log("  E/D - Canvas Modulate");
             _console.Log("  R   - Reset to defaults");
 
+            _mainMenu = new MainMenu(GraphicsDevice, _camera, _particles, _transitionManager, StartGame);
+            
+            _debugUI.Enabled = false;
+        }
+
+        private void StartGame()
+        {
             try
             {
                 var factoryContext = new EntityFactoryContext
@@ -103,16 +114,16 @@ namespace Snow
 
                 Vector2 playerCenter = new Vector2(143, 120);
                 _transitionManager.StartTransition(TransitionType.CircleReveal, 3.5f, playerCenter, 2f);
+
+                _gameStarted = true;
+                _debugUI.Enabled = true;
+                SpawnInitialFireflies();
             }
             catch (Exception ex)
             {
                 _console.LogError($"Failed to load scene: {ex.Message}");
                 _console.Log("Stack trace: " + ex.StackTrace);
             }
-            
-            _debugUI.Enabled = true;
-
-            SpawnInitialFireflies();
         }
 
         private void CreateGlowTexture()
@@ -169,26 +180,6 @@ namespace Snow
             }
         }
 
-        private Color ColorFromHSV(float h, float s, float v)
-        {
-            int hi = (int)(h / 60f) % 6;
-            float f = h / 60f - (int)(h / 60f);
-            
-            float p = v * (1 - s);
-            float q = v * (1 - f * s);
-            float t = v * (1 - (1 - f) * s);
-            
-            switch (hi)
-            {
-                case 0: return new Color(v, t, p);
-                case 1: return new Color(q, v, p);
-                case 2: return new Color(p, v, t);
-                case 3: return new Color(p, q, v);
-                case 4: return new Color(t, p, v);
-                default: return new Color(v, p, q);
-            }
-        }
-
         protected override void Update(GameTime gameTime)
         {
             _input.Update();
@@ -197,17 +188,34 @@ namespace Snow
             if (keyboard.IsKeyDown(Keys.Escape))
                 Exit();
 
-            HandleBloomControls(keyboard, gameTime);
-
             float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
             _transitionManager.Update(deltaTime);
 
+            if (!_gameStarted || _mainMenu.CurrentState == MenuState.MainMenu)
+            {
+                _mainMenu.Update(deltaTime);
+                
+                Rectangle worldBounds = new Rectangle(0, 0, 320, 180);
+                _particles.Update(deltaTime, worldBounds, null);
+                
+                _camera.Update(deltaTime);
+            }
+
+            if (!_gameStarted)
+            {
+                _previousKeyboard = keyboard;
+                base.Update(gameTime);
+                return;
+            }
+
+            HandleBloomControls(keyboard, gameTime);
+
             _player.Update(gameTime);
             
             Tilemap tilemap = _sceneManager.CurrentScene?.Tilemap;
-            Rectangle worldBounds = new Rectangle(0, 0, 320, 180);
-            _particles.Update(deltaTime, worldBounds, tilemap);
+            Rectangle worldBounds2 = new Rectangle(0, 0, 320, 180);
+            _particles.Update(deltaTime, worldBounds2, tilemap);
 
             Vector2 playerCenter = _player.Position + new Vector2(8, 12);
             float interactionRadius = 35f;
@@ -356,28 +364,35 @@ namespace Snow
 
             GraphicsDevice.Clear(new Color(24, 22, 43));
 
-            _graphicsManager.SpriteBatch.Begin(
-                samplerState: SamplerState.PointClamp,
-                transformMatrix: _camera.GetTransformMatrix()
-            );
+            if (_gameStarted)
+            {
+                _graphicsManager.SpriteBatch.Begin(
+                    samplerState: SamplerState.PointClamp,
+                    transformMatrix: _camera.GetTransformMatrix()
+                );
 
-            _sceneManager.Draw(_graphicsManager.SpriteBatch, _camera, gameTime);
+                _sceneManager.Draw(_graphicsManager.SpriteBatch, _camera, gameTime);
 
-            _graphicsManager.SpriteBatch.End();
+                _graphicsManager.SpriteBatch.End();
 
-            _particles.DrawPhysicsParticlesGlow(_graphicsManager.SpriteBatch, _glowTexture, _camera.GetTransformMatrix());
-            _particles.DrawPhysicsParticles(_graphicsManager.SpriteBatch, _camera.GetTransformMatrix());
-            _particles.Draw(_graphicsManager.SpriteBatch, _camera.GetTransformMatrix());
+                _particles.DrawPhysicsParticlesGlow(_graphicsManager.SpriteBatch, _glowTexture, _camera.GetTransformMatrix());
+                _particles.DrawPhysicsParticles(_graphicsManager.SpriteBatch, _camera.GetTransformMatrix());
+                _particles.Draw(_graphicsManager.SpriteBatch, _camera.GetTransformMatrix());
 
-            _graphicsManager.SpriteBatch.Begin(
-                samplerState: SamplerState.PointClamp,
-                transformMatrix: _camera.GetTransformMatrix()
-            );
+                _graphicsManager.SpriteBatch.Begin(
+                    samplerState: SamplerState.PointClamp,
+                    transformMatrix: _camera.GetTransformMatrix()
+                );
 
-            _sceneManager.DrawEntities(_graphicsManager.SpriteBatch, gameTime);
-            _player.Draw(_graphicsManager.SpriteBatch, gameTime);
+                _sceneManager.DrawEntities(_graphicsManager.SpriteBatch, gameTime);
+                _player.Draw(_graphicsManager.SpriteBatch, gameTime);
 
-            _graphicsManager.SpriteBatch.End();
+                _graphicsManager.SpriteBatch.End();
+            }
+            else
+            {
+                _particles.Draw(_graphicsManager.SpriteBatch, null);
+            }
 
             _postProcessing.EndGameRender();
 
@@ -386,9 +401,17 @@ namespace Snow
 
             _transitionManager.Draw();
 
-            int entityCount = _sceneManager.CurrentScene?.Entities.Count ?? 0;
-            _debugUI.Draw(_graphicsManager.SpriteBatch, _player, _camera, entityCount);
-            _debugUI.DrawCollisionBoxes(_graphicsManager.SpriteBatch, _player, _camera, _pixel);
+            if (!_gameStarted || _mainMenu.CurrentState == MenuState.MainMenu)
+            {
+                _mainMenu.Draw(_graphicsManager.SpriteBatch);
+            }
+
+            if (_gameStarted)
+            {
+                int entityCount = _sceneManager.CurrentScene?.Entities.Count ?? 0;
+                _debugUI.Draw(_graphicsManager.SpriteBatch, _player, _camera, entityCount);
+                _debugUI.DrawCollisionBoxes(_graphicsManager.SpriteBatch, _player, _camera, _pixel);
+            }
 
             _canvasUI.Draw(_graphicsManager.SpriteBatch);
 

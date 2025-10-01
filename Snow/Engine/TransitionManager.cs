@@ -39,7 +39,6 @@ namespace Snow.Engine
     {
         private GraphicsDevice _graphicsDevice;
         private Texture2D _pixel;
-        private RenderTarget2D _maskTarget;
         private Transition _currentTransition;
         private SpriteBatch _spriteBatch;
         private Effect _maskEffect;
@@ -54,21 +53,24 @@ namespace Snow.Engine
             _pixel = new Texture2D(graphicsDevice, 1, 1);
             _pixel.SetData(new[] { Color.White });
 
+            CreateShader();
+        }
+
+        private void CreateShader()
+        {
             string shaderCode = @"
                 #if OPENGL
                     #define SV_POSITION POSITION
                     #define VS_SHADERMODEL vs_3_0
                     #define PS_SHADERMODEL ps_3_0
                 #else
-                    #define VS_SHADERMODEL vs_4_0
-                    #define PS_SHADERMODEL ps_4_0
+                    #define VS_SHADERMODEL vs_4_0_level_9_1
+                    #define PS_SHADERMODEL ps_4_0_level_9_1
                 #endif
 
                 float2 Center;
                 float Radius;
                 float2 Resolution;
-
-                sampler2D MaskSampler : register(s0);
 
                 struct VertexShaderOutput
                 {
@@ -82,14 +84,8 @@ namespace Snow.Engine
                     float2 pixelPos = input.TextureCoordinates * Resolution;
                     float dist = distance(pixelPos, Center);
                     
-                    if (dist > Radius)
-                    {
-                        return float4(0, 0, 0, 1);
-                    }
-                    else
-                    {
-                        return float4(0, 0, 0, 0);
-                    }
+                    float alpha = dist > Radius ? 1.0 : 0.0;
+                    return float4(0, 0, 0, alpha);
                 }
 
                 technique BasicColorDrawing
@@ -103,16 +99,19 @@ namespace Snow.Engine
 
             try
             {
-                _maskEffect = new Effect(graphicsDevice, System.Text.Encoding.UTF8.GetBytes(shaderCode));
+                _maskEffect = new Effect(_graphicsDevice, System.Text.Encoding.UTF8.GetBytes(shaderCode));
+                System.Console.WriteLine("Transition shader compiled successfully");
             }
-            catch
+            catch (Exception e)
             {
+                System.Console.WriteLine($"Transition shader failed to compile: {e.Message}");
                 _maskEffect = null;
             }
         }
 
         public void StartTransition(TransitionType type, float duration, Vector2 focalPoint, float delay = 0f, Action onComplete = null)
         {
+            System.Console.WriteLine($"Starting transition: {type}, Duration: {duration}, FocalPoint: {focalPoint}, Delay: {delay}");
             _currentTransition = new Transition(type, duration, focalPoint, delay)
             {
                 OnComplete = onComplete
@@ -145,67 +144,50 @@ namespace Snow.Engine
             if (_currentTransition == null || _currentTransition.IsComplete)
                 return;
 
+            if (_maskEffect == null)
+            {
+                System.Console.WriteLine("Mask effect is null - shader failed to compile");
+                return;
+            }
+
             int screenWidth = _graphicsDevice.PresentationParameters.BackBufferWidth;
             int screenHeight = _graphicsDevice.PresentationParameters.BackBufferHeight;
 
+            float scaleX = (float)screenWidth / 320f;
+            float scaleY = (float)screenHeight / 180f;
+            float scale = Math.Min(scaleX, scaleY);
+
+            int scaledWidth = (int)(320 * scale);
+            int scaledHeight = (int)(180 * scale);
+            int offsetX = (screenWidth - scaledWidth) / 2;
+            int offsetY = (screenHeight - scaledHeight) / 2;
+
+            Vector2 screenFocalPoint = new Vector2(
+                _currentTransition.FocalPoint.X * scale + offsetX,
+                _currentTransition.FocalPoint.Y * scale + offsetY
+            );
+
             if (_currentTransition.DelayTimer < _currentTransition.Delay)
             {
-                float scaleX = (float)screenWidth / 320f;
-                float scaleY = (float)screenHeight / 180f;
-                float scale = Math.Min(scaleX, scaleY);
-
-                int scaledWidth = (int)(320 * scale);
-                int scaledHeight = (int)(180 * scale);
-                int offsetX = (screenWidth - scaledWidth) / 2;
-                int offsetY = (screenHeight - scaledHeight) / 2;
-
-                Vector2 screenFocalPoint = new Vector2(
-                    _currentTransition.FocalPoint.X * scale + offsetX,
-                    _currentTransition.FocalPoint.Y * scale + offsetY
-                );
-
                 float smallRadius = 30f * scale;
 
-                if (_maskEffect != null)
-                {
-                    _maskEffect.Parameters["Center"].SetValue(screenFocalPoint);
-                    _maskEffect.Parameters["Radius"].SetValue(smallRadius);
-                    _maskEffect.Parameters["Resolution"].SetValue(new Vector2(screenWidth, screenHeight));
+                _maskEffect.Parameters["Center"].SetValue(screenFocalPoint);
+                _maskEffect.Parameters["Radius"].SetValue(smallRadius);
+                _maskEffect.Parameters["Resolution"].SetValue(new Vector2(screenWidth, screenHeight));
 
-                    _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, _maskEffect);
-                    _spriteBatch.Draw(_pixel, new Rectangle(0, 0, screenWidth, screenHeight), Color.White);
-                    _spriteBatch.End();
-                }
-                else
-                {
-                    _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp);
-
-                    for (int y = 0; y < screenHeight; y += 2)
-                    {
-                        for (int x = 0; x < screenWidth; x += 2)
-                        {
-                            Vector2 pixelPos = new Vector2(x, y);
-                            float dist = Vector2.Distance(pixelPos, screenFocalPoint);
-                            
-                            if (dist > smallRadius)
-                            {
-                                _spriteBatch.Draw(_pixel, new Rectangle(x, y, 2, 2), Color.Black);
-                            }
-                        }
-                    }
-
-                    _spriteBatch.End();
-                }
+                _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, _maskEffect);
+                _spriteBatch.Draw(_pixel, new Rectangle(0, 0, screenWidth, screenHeight), Color.White);
+                _spriteBatch.End();
                 return;
             }
 
             switch (_currentTransition.Type)
             {
                 case TransitionType.CircleReveal:
-                    DrawCircleReveal(screenWidth, screenHeight);
+                    DrawCircleReveal(screenWidth, screenHeight, screenFocalPoint, scale);
                     break;
                 case TransitionType.CircleClose:
-                    DrawCircleClose(screenWidth, screenHeight);
+                    DrawCircleClose(screenWidth, screenHeight, screenFocalPoint, scale);
                     break;
                 case TransitionType.Fade:
                     DrawFade(screenWidth, screenHeight);
@@ -213,116 +195,32 @@ namespace Snow.Engine
             }
         }
 
-        private void DrawCircleReveal(int screenWidth, int screenHeight)
+        private void DrawCircleReveal(int screenWidth, int screenHeight, Vector2 screenFocalPoint, float scale)
         {
-            float scaleX = (float)screenWidth / 320f;
-            float scaleY = (float)screenHeight / 180f;
-            float scale = Math.Min(scaleX, scaleY);
-
-            int scaledWidth = (int)(320 * scale);
-            int scaledHeight = (int)(180 * scale);
-            int offsetX = (screenWidth - scaledWidth) / 2;
-            int offsetY = (screenHeight - scaledHeight) / 2;
-
-            Vector2 screenFocalPoint = new Vector2(
-                _currentTransition.FocalPoint.X * scale + offsetX,
-                _currentTransition.FocalPoint.Y * scale + offsetY
-            );
-
             float maxDist = (float)Math.Sqrt(screenWidth * screenWidth + screenHeight * screenHeight);
             float startRadius = 30f * scale;
             float currentRadius = MathHelper.Lerp(startRadius, maxDist, EaseOutCubic(_currentTransition.Progress));
 
-            if (_maskEffect != null)
-            {
-                _maskEffect.Parameters["Center"].SetValue(screenFocalPoint);
-                _maskEffect.Parameters["Radius"].SetValue(currentRadius);
-                _maskEffect.Parameters["Resolution"].SetValue(new Vector2(screenWidth, screenHeight));
+            _maskEffect.Parameters["Center"].SetValue(screenFocalPoint);
+            _maskEffect.Parameters["Radius"].SetValue(currentRadius);
+            _maskEffect.Parameters["Resolution"].SetValue(new Vector2(screenWidth, screenHeight));
 
-                _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, _maskEffect);
-                _spriteBatch.Draw(_pixel, new Rectangle(0, 0, screenWidth, screenHeight), Color.White);
-                _spriteBatch.End();
-            }
-            else
-            {
-                DrawCircleRevealFallback(screenWidth, screenHeight, screenFocalPoint, currentRadius);
-            }
-        }
-
-        private void DrawCircleRevealFallback(int screenWidth, int screenHeight, Vector2 focalPoint, float currentRadius)
-        {
-            _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp);
-
-            for (int y = 0; y < screenHeight; y += 2)
-            {
-                for (int x = 0; x < screenWidth; x += 2)
-                {
-                    Vector2 pixelPos = new Vector2(x, y);
-                    float dist = Vector2.Distance(pixelPos, focalPoint);
-                    
-                    if (dist > currentRadius)
-                    {
-                        _spriteBatch.Draw(_pixel, new Rectangle(x, y, 2, 2), Color.Black);
-                    }
-                }
-            }
-
+            _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, _maskEffect);
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, screenWidth, screenHeight), Color.White);
             _spriteBatch.End();
         }
 
-        private void DrawCircleClose(int screenWidth, int screenHeight)
+        private void DrawCircleClose(int screenWidth, int screenHeight, Vector2 screenFocalPoint, float scale)
         {
             float maxDist = (float)Math.Sqrt(screenWidth * screenWidth + screenHeight * screenHeight);
             float currentRadius = MathHelper.Lerp(maxDist, 0, EaseInCubic(_currentTransition.Progress));
 
-            float scaleX = (float)screenWidth / 320f;
-            float scaleY = (float)screenHeight / 180f;
-            float scale = Math.Min(scaleX, scaleY);
+            _maskEffect.Parameters["Center"].SetValue(screenFocalPoint);
+            _maskEffect.Parameters["Radius"].SetValue(currentRadius);
+            _maskEffect.Parameters["Resolution"].SetValue(new Vector2(screenWidth, screenHeight));
 
-            int scaledWidth = (int)(320 * scale);
-            int scaledHeight = (int)(180 * scale);
-            int offsetX = (screenWidth - scaledWidth) / 2;
-            int offsetY = (screenHeight - scaledHeight) / 2;
-
-            Vector2 screenFocalPoint = new Vector2(
-                _currentTransition.FocalPoint.X * scale + offsetX,
-                _currentTransition.FocalPoint.Y * scale + offsetY
-            );
-
-            if (_maskEffect != null)
-            {
-                _maskEffect.Parameters["Center"].SetValue(screenFocalPoint);
-                _maskEffect.Parameters["Radius"].SetValue(currentRadius);
-                _maskEffect.Parameters["Resolution"].SetValue(new Vector2(screenWidth, screenHeight));
-
-                _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, _maskEffect);
-                _spriteBatch.Draw(_pixel, new Rectangle(0, 0, screenWidth, screenHeight), Color.White);
-                _spriteBatch.End();
-            }
-            else
-            {
-                DrawCircleCloseFallback(screenWidth, screenHeight, screenFocalPoint, currentRadius);
-            }
-        }
-
-        private void DrawCircleCloseFallback(int screenWidth, int screenHeight, Vector2 focalPoint, float currentRadius)
-        {
-            _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp);
-
-            for (int y = 0; y < screenHeight; y += 2)
-            {
-                for (int x = 0; x < screenWidth; x += 2)
-                {
-                    Vector2 pixelPos = new Vector2(x, y);
-                    float dist = Vector2.Distance(pixelPos, focalPoint);
-                    
-                    if (dist > currentRadius)
-                    {
-                        _spriteBatch.Draw(_pixel, new Rectangle(x, y, 2, 2), Color.Black);
-                    }
-                }
-            }
-
+            _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, _maskEffect);
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, screenWidth, screenHeight), Color.White);
             _spriteBatch.End();
         }
 
@@ -344,11 +242,6 @@ namespace Snow.Engine
             return t1 * t1 * t1 + 1f;
         }
 
-        private float EaseInOutQuad(float t)
-        {
-            return t < 0.5f ? 2f * t * t : 1f - (float)Math.Pow(-2f * t + 2f, 2f) / 2f;
-        }
-
         private float EaseInCubic(float t)
         {
             return t * t * t;
@@ -357,7 +250,6 @@ namespace Snow.Engine
         public void Dispose()
         {
             _pixel?.Dispose();
-            _maskTarget?.Dispose();
             _maskEffect?.Dispose();
             _spriteBatch?.Dispose();
         }
