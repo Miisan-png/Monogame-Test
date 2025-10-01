@@ -6,88 +6,66 @@ background_color = #1a1a2eff
 music = "assets/audio/forest_ambient.ogg"
 gravity = 1400
 
-[camera]
-room_width = 320
-room_height = 180
-follow_mode = "room"
-smooth_speed = 0
-
 [entity id="playerspawn_1"]
 type = "PlayerSpawn"
-position = 143.3, 80.9
-
-[entity id="slime_1"]
-type = "Slime"
-position = 200, 100
-properties = {patrol_distance: 50, speed: 30}
-
-[entity id="chest_1"]
-type = "Chest"
-position = 280, 120
-properties = {contains: "coin", amount: 50}
-
-[particle_emitter id="fireflies_1"]
-type = "ambient"
-position = 150, 60
-emission_rate = 3
-particle_texture = "assets/particles/glow.png"
-properties = {speed: 20, lifetime: 3.0, color: "#ffff00"}
-
-[particle_emitter id="waterfall_1"]
-type = "waterfall"
-position = 100, 40
-emission_rate = 15
-particle_texture = "assets/particles/water.png"
-properties = {speed: 80, lifetime: 1.5, gravity: 200}
+position = 477.29933333333327, 134.84133333333335
 
 [light id="torch_1"]
-position = 160, 80
-radius = 80
+position = 160.0, 80.0
+radius = 80.0
 color = #ff8844
 intensity = 2.0
 type = "point"
-properties = {flicker: true, flicker_speed: 0.1}
 
 [light id="moonlight"]
-position = 160, 0
-radius = 200
+position = 160.0, 0.0
+radius = 200.0
 color = #6699ff
 intensity = 0.8
 type = "ambient"
 
 [audio id="river_ambient"]
-position = 100, 90
+position = 100.0, 90.0
 audio_file = "assets/audio/river.ogg"
 volume = 0.6
 loop = true
 autoplay = true
-min_distance = 50
-max_distance = 200
+min_distance = 50.0
+max_distance = 200.0
 
 [trigger id="level_exit"]
-position = 300, 100
-size = 32, 32
+position = 300.0, 100.0
+size = 32.0, 32.0
 trigger_type = "level_transition"
 action = "load_scene"
-properties = {target_scene: "forest_2.scene", spawn_point: "entrance"}
 
 [trigger id="checkpoint_1"]
-position = 150, 100
-size = 16, 32
+position = 150.0, 100.0
+size = 16.0, 32.0
 trigger_type = "checkpoint"
 action = "save_progress"
-properties = {checkpoint_id: "forest_1_mid"}
 
 [spawn_point id="enemy_spawn_1"]
-position = 250, 90
+position = 250.0, 90.0
 entity_type = "Slime"
 spawn_delay = 5.0
 max_spawns = 3
-properties = {patrol_distance: 40, speed: 25}
 
 [spawn_point id="coin_spawn_1"]
-position = 180, 70
+position = 180.0, 70.0
 entity_type = "Coin"
 spawn_delay = 10.0
 max_spawns = -1
-properties = {value: 10}
+
+[particle_emitter id="fireflies_1"]
+position = 150.0, 60.0
+type = "ambient"
+particle_texture = "assets/particles/glow.png"
+emission_rate = 3
+
+[particle_emitter id="waterfall_1"]
+position = 100.0, 40.0
+type = "waterfall"
+particle_texture = "assets/particles/water.png"
+emission_rate = 15
+
