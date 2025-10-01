@@ -6,19 +6,14 @@ background_color = #000000ff
 music = "assets/audio/forest_ambient.ogg"
 gravity = 1400
 
-[camera]
-room_width = 320
-room_height = 180
-follow_mode = "room"
-smooth_speed = 10
-
 [entity id="playerspawn_1"]
 type = "PlayerSpawn"
 position = 143.3, 80.9
 
 [light id="moonlight"]
-position = 160, 0
-radius = 200
+position = 160.0, 0.0
+radius = 200.0
 color = #8cff80ff
 intensity = 0.8
 type = "ambient"
+

@@ -19,6 +19,9 @@ namespace Snow
         private DebugConsole _console;
         private Player _player;
         private SceneManager _sceneManager;
+
+        private CanvasUI _canvasUI;
+
         private Random _random;
         private float _windTimer;
 
@@ -46,6 +49,7 @@ namespace Snow
             _console = new DebugConsole();
             _console.Open();
 
+            _canvasUI = new CanvasUI(GraphicsDevice);
             _graphicsManager = new GraphicsManager(GraphicsDevice);
             _input = new InputManager();
             _postProcessing = new PostProcessing(GraphicsDevice, 320, 180);
@@ -181,6 +185,10 @@ namespace Snow
             _postProcessing.DrawFinal();
 
             _debug.Draw(_graphicsManager.SpriteBatch, _player, _camera);
+
+
+            _canvasUI.Draw(_graphicsManager.SpriteBatch, _player);
+
 
             base.Draw(gameTime);
         }
