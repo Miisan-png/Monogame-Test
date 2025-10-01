@@ -13,13 +13,15 @@ namespace Snow.Game
             _font = new BitmapFont(device, "assets/Font/default/default_font_data.txt");
         }
 
-        public void Draw(SpriteBatch sb, Player player)
+        public void Update(GameTime gameTime)
         {
-            sb.Begin(samplerState: SamplerState.PointClamp);
-            _font.DrawString(sb, $"Player Pos: {player.Position.X:0}, {player.Position.Y:0}", new Vector2(20, 20), Color.White, 3f);
-            _font.DrawString(sb, $"Velocity: {player.Velocity.X:0.0}, {player.Velocity.Y:0.0}", new Vector2(20, 50), Color.Yellow, 3f);
-            _font.DrawString(sb, "Snow Engine Font Rendering", new Vector2(20, 90), Color.Blue, 6f);
-            sb.End();
+        }
+
+        public void Draw(SpriteBatch spriteBatch)
+        {
+            spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+
+            spriteBatch.End();
         }
     }
 }

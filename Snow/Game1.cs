@@ -15,12 +15,13 @@ namespace Snow
         private PostProcessing _postProcessing;
         private Camera _camera;
         private ParticleSystem _particles;
-        private DebugOverlay _debug;
+        private DebugOverlay _debugOverlay;
+        private DebugUI _debugUI;
         private DebugConsole _console;
         private Player _player;
         private SceneManager _sceneManager;
-
         private CanvasUI _canvasUI;
+        private Texture2D _pixel;
 
         private Random _random;
         private float _windTimer;
@@ -49,13 +50,17 @@ namespace Snow
             _console = new DebugConsole();
             _console.Open();
 
+            _pixel = new Texture2D(GraphicsDevice, 1, 1);
+            _pixel.SetData(new[] { Color.White });
+
             _canvasUI = new CanvasUI(GraphicsDevice);
+            _debugUI = new DebugUI(GraphicsDevice);
             _graphicsManager = new GraphicsManager(GraphicsDevice);
             _input = new InputManager();
             _postProcessing = new PostProcessing(GraphicsDevice, 320, 180);
             _camera = new Camera(320, 180, 320, 180);
             _particles = new ParticleSystem(GraphicsDevice, 5000);
-            _debug = new DebugOverlay(GraphicsDevice);
+            _debugOverlay = new DebugOverlay(GraphicsDevice);
             _random = new Random();
             _windTimer = 0f;
 
@@ -86,7 +91,7 @@ namespace Snow
                 _console.Log("Stack trace: " + ex.StackTrace);
             }
             
-            _debug.Enabled = true;
+            _debugUI.Enabled = true;
         }
 
         protected override void Update(GameTime gameTime)
@@ -95,11 +100,6 @@ namespace Snow
 
             if (Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
-
-            if (_input.IsKeyPressed(Keys.F3))
-            {
-                _debug.Enabled = !_debug.Enabled;
-            }
 
             float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
@@ -137,8 +137,10 @@ namespace Snow
             }
 
             _camera.Follow(_player.Position);
+            _camera.Update(deltaTime);
             _particles.Update(deltaTime);
-            _debug.Update(gameTime);
+            _debugUI.Update(gameTime);
+            _canvasUI.Update(gameTime);
 
             base.Update(gameTime);
         }
@@ -177,29 +179,28 @@ namespace Snow
 
             _graphicsManager.SpriteBatch.End();
 
-            _debug.DrawCollisionBoxes(_graphicsManager.SpriteBatch, _player, _camera);
-
             _postProcessing.EndGameRender();
 
             _postProcessing.ApplyPostProcessing();
             _postProcessing.DrawFinal();
 
-            _debug.Draw(_graphicsManager.SpriteBatch, _player, _camera);
+            int entityCount = _sceneManager.CurrentScene?.Entities.Count ?? 0;
+            _debugUI.Draw(_graphicsManager.SpriteBatch, _player, _camera, entityCount);
+            _debugUI.DrawCollisionBoxes(_graphicsManager.SpriteBatch, _player, _camera, _pixel);
 
-
-            _canvasUI.Draw(_graphicsManager.SpriteBatch, _player);
-
+            _canvasUI.Draw(_graphicsManager.SpriteBatch);
 
             base.Draw(gameTime);
         }
 
         protected override void UnloadContent()
         {
-            _debug?.Dispose();
+            _debugOverlay?.Dispose();
             _console?.Dispose();
             _particles?.Dispose();
             _postProcessing?.Dispose();
             _graphicsManager?.Dispose();
+            _pixel?.Dispose();
             base.UnloadContent();
         }
     }
