@@ -23,6 +23,7 @@ namespace Snow
         private CanvasUI _canvasUI;
         private Texture2D _pixel;
         private Texture2D _glowTexture;
+        private TransitionManager _transitionManager;
 
         private Random _random;
         private float _windTimer;
@@ -68,6 +69,7 @@ namespace Snow
             _camera = new Camera(320, 180, 320, 180);
             _particles = new ParticleSystem(GraphicsDevice, 5000);
             _debugOverlay = new DebugOverlay(GraphicsDevice);
+            _transitionManager = new TransitionManager(GraphicsDevice);
             _random = new Random();
             _windTimer = 0f;
             _physicsParticleSpawnTimer = 0f;
@@ -98,6 +100,9 @@ namespace Snow
                 _console.Log($"Player spawned at ({scene.PlayerSpawnPosition.X}, {scene.PlayerSpawnPosition.Y})");
 
                 factoryContext.Tilemap = scene.Tilemap;
+
+                Vector2 playerCenter = new Vector2(143, 120);
+                _transitionManager.StartTransition(TransitionType.CircleReveal, 3.5f, playerCenter, 2f);
             }
             catch (Exception ex)
             {
@@ -195,6 +200,8 @@ namespace Snow
             HandleBloomControls(keyboard, gameTime);
 
             float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+            _transitionManager.Update(deltaTime);
 
             _player.Update(gameTime);
             
@@ -347,14 +354,7 @@ namespace Snow
         {
             _postProcessing.BeginGameRender();
 
-            if (_sceneManager.CurrentScene != null)
-            {
-                GraphicsDevice.Clear(_sceneManager.CurrentScene.BackgroundColor);
-            }
-            else
-            {
-                GraphicsDevice.Clear(Color.Black);
-            }
+            GraphicsDevice.Clear(new Color(24, 22, 43));
 
             _graphicsManager.SpriteBatch.Begin(
                 samplerState: SamplerState.PointClamp,
@@ -384,6 +384,8 @@ namespace Snow
             _postProcessing.ApplyPostProcessing();
             _postProcessing.DrawFinal(_canvasModulate);
 
+            _transitionManager.Draw();
+
             int entityCount = _sceneManager.CurrentScene?.Entities.Count ?? 0;
             _debugUI.Draw(_graphicsManager.SpriteBatch, _player, _camera, entityCount);
             _debugUI.DrawCollisionBoxes(_graphicsManager.SpriteBatch, _player, _camera, _pixel);
@@ -400,10 +402,10 @@ namespace Snow
             _particles?.Dispose();
             _postProcessing?.Dispose();
             _graphicsManager?.Dispose();
+            _transitionManager?.Dispose();
             _pixel?.Dispose();
             _glowTexture?.Dispose();
             base.UnloadContent();
         }
     }
 }
-

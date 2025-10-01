@@ -2,18 +2,11 @@
 name = "Forest Level 1 Enhanced"
 tilemap = "levels/lvl.json"
 tileset = "assets/world_tileset.png"
-background_color = #000000ff
+background_color = rgba(81, 73, 150, 1)
 music = "assets/audio/forest_ambient.ogg"
 gravity = 1400
 
 [entity id="playerspawn_1"]
 type = "PlayerSpawn"
 position = 143.3, 80.9
-
-[light id="moonlight"]
-position = 160.0, 0.0
-radius = 200.0
-color = #8cff80ff
-intensity = 0.8
-type = "ambient"
 
