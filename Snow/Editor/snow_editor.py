@@ -1,11 +1,22 @@
 import sys
+import os
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QPalette, QColor
-from unified_editor_window import UnifiedEditorWindow
+from PyQt5.QtCore import Qt
+
+os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
+os.environ["QT_SCALE_FACTOR"] = "0.8"
 
 def main():
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+    
     app = QApplication(sys.argv)
     app.setStyle('Fusion')
+    
+    font = app.font()
+    font.setPointSize(10)
+    app.setFont(font)
     
     dark_palette = QPalette()
     dark_palette.setColor(QPalette.Window, QColor(30, 30, 30))
@@ -24,6 +35,55 @@ def main():
     
     app.setPalette(dark_palette)
     
+    app.setStyleSheet("""
+        QWidget {
+            font-size: 11pt;
+        }
+        QLabel {
+            font-size: 11pt;
+        }
+        QPushButton {
+            font-size: 11pt;
+            min-height: 28px;
+            padding: 6px 14px;
+        }
+        QSpinBox, QDoubleSpinBox, QLineEdit {
+            font-size: 11pt;
+            min-height: 26px;
+            padding: 4px 8px;
+        }
+        QGroupBox {
+            font-size: 11pt;
+            font-weight: bold;
+            padding-top: 16px;
+            margin-top: 8px;
+        }
+        QMenuBar {
+            font-size: 11pt;
+            background-color: #2d2d2d;
+            padding: 6px;
+        }
+        QMenuBar::item {
+            padding: 6px 14px;
+        }
+        QStatusBar {
+            font-size: 11pt;
+            background-color: #2d2d2d;
+            border-top: 1px solid #404040;
+            padding: 6px;
+        }
+        QToolBar {
+            spacing: 8px;
+            padding: 10px;
+        }
+        QDockWidget::title {
+            font-size: 11pt;
+            font-weight: bold;
+            padding: 8px;
+        }
+    """)
+    
+    from unified_editor_window import UnifiedEditorWindow
     editor = UnifiedEditorWindow()
     editor.show()
     

@@ -8,15 +8,19 @@ class TilePaletteWindow(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Tile Palette")
-        self.setGeometry(100, 100, 400, 600)
+        self.setGeometry(100, 100, 500, 700)
         self.setWindowFlags(Qt.Window)
         
         self.tile_surfaces = []
         self.selected_tile = 0
         self.base_tile_size = 16
+        
         self.display_tile_size = 48
         self.zoom = 3.0
-        self.tiles_per_row = 6
+        
+        self.tileset_columns = 0
+        self.tileset_rows = 0
+        
         self.scroll_offset = 0
         self.tile_spacing = 4
         
@@ -25,41 +29,68 @@ class TilePaletteWindow(QDialog):
     
     def init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(8)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
         
         header = QWidget()
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(0, 0, 0, 0)
         
         title = QLabel("Select Tile")
-        title.setStyleSheet("font-weight: bold; font-size: 14px; color: #e0e0e0;")
+        title.setStyleSheet("font-weight: bold; font-size: 15pt; color: #e0e0e0;")
         header_layout.addWidget(title)
         
         header_layout.addStretch()
         
         zoom_out_btn = QPushButton("-")
-        zoom_out_btn.setFixedSize(32, 32)
+        zoom_out_btn.setFixedSize(36, 36)
         zoom_out_btn.clicked.connect(self.zoom_out)
-        zoom_out_btn.setStyleSheet("QPushButton { background-color: #383838; border: 1px solid #505050; border-radius: 3px; font-weight: bold; font-size: 16px; } QPushButton:hover { background-color: #484848; }")
+        zoom_out_btn.setStyleSheet("""
+            QPushButton { 
+                background-color: #383838; 
+                border: 1px solid #505050; 
+                border-radius: 3px; 
+                font-weight: bold; 
+                font-size: 18pt; 
+            } 
+            QPushButton:hover { 
+                background-color: #484848; 
+            }
+        """)
         header_layout.addWidget(zoom_out_btn)
         
         self.zoom_label = QLabel(f"{int(self.zoom * 100)}%")
-        self.zoom_label.setFixedWidth(60)
+        self.zoom_label.setFixedWidth(70)
         self.zoom_label.setAlignment(Qt.AlignCenter)
-        self.zoom_label.setStyleSheet("color: #b0b0b0; font-size: 14px; font-weight: bold;")
+        self.zoom_label.setStyleSheet("color: #b0b0b0; font-size: 13pt; font-weight: bold;")
         header_layout.addWidget(self.zoom_label)
         
         zoom_in_btn = QPushButton("+")
-        zoom_in_btn.setFixedSize(32, 32)
+        zoom_in_btn.setFixedSize(36, 36)
         zoom_in_btn.clicked.connect(self.zoom_in)
-        zoom_in_btn.setStyleSheet("QPushButton { background-color: #383838; border: 1px solid #505050; border-radius: 3px; font-weight: bold; font-size: 16px; } QPushButton:hover { background-color: #484848; }")
+        zoom_in_btn.setStyleSheet("""
+            QPushButton { 
+                background-color: #383838; 
+                border: 1px solid #505050; 
+                border-radius: 3px; 
+                font-weight: bold; 
+                font-size: 18pt; 
+            } 
+            QPushButton:hover { 
+                background-color: #484848; 
+            }
+        """)
         header_layout.addWidget(zoom_in_btn)
         
         layout.addWidget(header)
         
+        info_label = QLabel("Tiles are displayed in their original tileset layout")
+        info_label.setStyleSheet("color: #888; font-size: 10pt; font-style: italic;")
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label)
+        
         self.canvas = QWidget()
-        self.canvas.setMinimumHeight(500)
+        self.canvas.setMinimumHeight(550)
         self.canvas.paintEvent = self.paint_canvas
         self.canvas.mousePressEvent = self.canvas_mouse_press
         self.canvas.wheelEvent = self.canvas_wheel
@@ -72,17 +103,39 @@ class TilePaletteWindow(QDialog):
         self.tile_surfaces = tile_surfaces
         self.selected_tile = 0
         self.scroll_offset = 0
+        
+        self.calculate_tileset_dimensions()
         self.update_display_size()
         self.canvas.update()
-        print(f"Palette window updated, tiles_per_row={self.tiles_per_row}, display_tile_size={self.display_tile_size}")
+        
+        print(f"Palette configured: {self.tileset_columns}x{self.tileset_rows} grid, display_size={self.display_tile_size}")
+    
+    def calculate_tileset_dimensions(self):
+        if not self.tile_surfaces:
+            self.tileset_columns = 0
+            self.tileset_rows = 0
+            return
+        
+        total_tiles = len(self.tile_surfaces)
+        
+        self.tileset_columns = int(total_tiles ** 0.5)
+        
+        common_widths = [8, 10, 12, 16, 20, 24, 32]
+        for width in common_widths:
+            if total_tiles % width == 0:
+                self.tileset_columns = width
+                break
+        
+        self.tileset_rows = (total_tiles + self.tileset_columns - 1) // self.tileset_columns
+        
+        print(f"Calculated tileset layout: {self.tileset_columns} columns x {self.tileset_rows} rows")
     
     def update_display_size(self):
         self.display_tile_size = int(self.base_tile_size * self.zoom)
-        self.tiles_per_row = max(1, (self.canvas.width() - 20) // (self.display_tile_size + self.tile_spacing))
         self.zoom_label.setText(f"{int(self.zoom * 100)}%")
     
     def zoom_in(self):
-        self.zoom = min(8.0, self.zoom * 1.5)
+        self.zoom = min(10.0, self.zoom * 1.5)
         self.update_display_size()
         self.canvas.update()
     
@@ -93,7 +146,7 @@ class TilePaletteWindow(QDialog):
     
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.update_display_size()
+        self.canvas.update()
     
     def canvas_mouse_press(self, event):
         if event.button() == Qt.LeftButton and self.tile_surfaces:
@@ -105,11 +158,14 @@ class TilePaletteWindow(QDialog):
                 print(f"Selected tile: {tile_index}")
     
     def canvas_wheel(self, event):
-        self.scroll_offset -= event.angleDelta().y() // 120 * 40
+        self.scroll_offset -= event.angleDelta().y() // 120 * 50
         self.scroll_offset = max(0, self.scroll_offset)
         self.canvas.update()
     
     def get_tile_at_pos(self, pos):
+        if self.tileset_columns == 0:
+            return -1
+        
         adjusted_y = pos.y() + self.scroll_offset
         adjusted_x = pos.x() - 10
         
@@ -117,20 +173,27 @@ class TilePaletteWindow(QDialog):
             return -1
         
         tile_total_size = self.display_tile_size + self.tile_spacing
-        row = adjusted_y // tile_total_size
+        
         col = adjusted_x // tile_total_size
-        return int(row * self.tiles_per_row + col)
+        row = adjusted_y // tile_total_size
+        
+        if col >= self.tileset_columns:
+            return -1
+        
+        tile_index = int(row * self.tileset_columns + col)
+        return tile_index
     
     def paint_canvas(self, event):
         painter = QPainter(self.canvas)
         painter.fillRect(self.canvas.rect(), QColor(25, 25, 25))
         
-        if not self.tile_surfaces:
+        if not self.tile_surfaces or self.tileset_columns == 0:
             painter.setPen(QColor(140, 140, 140))
             font = painter.font()
             font.setPointSize(13)
             painter.setFont(font)
-            painter.drawText(self.canvas.rect(), Qt.AlignCenter, "No tiles loaded\nLoad tileset from main window")
+            painter.drawText(self.canvas.rect(), Qt.AlignCenter, 
+                           "No tiles loaded\nLoad tileset from main window")
             return
         
         y_offset = -self.scroll_offset
@@ -139,8 +202,8 @@ class TilePaletteWindow(QDialog):
         tile_total_size = self.display_tile_size + self.tile_spacing
         
         for i, tile in enumerate(self.tile_surfaces):
-            row = i // self.tiles_per_row
-            col = i % self.tiles_per_row
+            row = i // self.tileset_columns
+            col = i % self.tileset_columns
             
             x = x_start + col * tile_total_size
             y = y_offset + row * tile_total_size
@@ -165,3 +228,8 @@ class TilePaletteWindow(QDialog):
             else:
                 painter.setPen(QPen(QColor(60, 60, 60), 1))
                 painter.drawRect(x, y, self.display_tile_size, self.display_tile_size)
+        
+        tileset_width = self.tileset_columns * tile_total_size
+        painter.setPen(QPen(QColor(100, 100, 255, 80), 2))
+        painter.drawRect(x_start - 3, y_offset - 3, tileset_width + 6, 
+                        self.tileset_rows * tile_total_size + 6)
