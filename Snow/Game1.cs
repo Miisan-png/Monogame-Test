@@ -78,8 +78,6 @@ namespace Snow
             _random = new Random();
             _windTimer = 0f;
             _physicsParticleSpawnTimer = 0f;
-
-            // Initialize ImGui
             _imGuiRenderer = new MonoGame.ImGuiNet.ImGuiRenderer(this);
             _imGuiRenderer.RebuildFontAtlas();
 
@@ -366,10 +364,8 @@ namespace Snow
 
         protected override void Draw(GameTime gameTime)
         {
-            // Begin ImGui
             _imGuiRenderer.BeginLayout(gameTime);
             
-            // Sample ImGui window
             ImGuiNET.ImGui.ShowDemoWindow();
 
             _postProcessing.BeginGameRender();
@@ -427,7 +423,6 @@ namespace Snow
 
             _canvasUI.Draw(_graphicsManager.SpriteBatch);
 
-            // End ImGui
             _imGuiRenderer.EndLayout();
 
             base.Draw(gameTime);
