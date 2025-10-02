@@ -9,7 +9,7 @@ namespace Snow
 {
     public class Game1 : Microsoft.Xna.Framework.Game
     {
-        private const bool FULLSCREEN_ENABLED = true;
+        private const bool FULLSCREEN_ENABLED = false;
 
         private GraphicsDeviceManager _graphics;
         private GraphicsManager _graphicsManager;
@@ -27,6 +27,7 @@ namespace Snow
         private Texture2D _glowTexture;
         private TransitionManager _transitionManager;
         private MainMenu _mainMenu;
+        private MonoGame.ImGuiNet.ImGuiRenderer _imGuiRenderer;
 
         private Random _random;
         private float _windTimer;
@@ -78,10 +79,15 @@ namespace Snow
             _windTimer = 0f;
             _physicsParticleSpawnTimer = 0f;
 
+            // Initialize ImGui
+            _imGuiRenderer = new MonoGame.ImGuiNet.ImGuiRenderer(this);
+            _imGuiRenderer.RebuildFontAtlas();
+
             _sceneManager = new SceneManager(GraphicsDevice, _graphicsManager);
 
             _console.Log("Snow Engine initialized");
             _console.LogSuccess($"Bloom enabled: {_postProcessing.BloomEnabled}");
+            _console.LogSuccess("ImGui initialized");
             _console.Log("Controls:");
             _console.Log("  Q/A - Bloom Threshold");
             _console.Log("  W/S - Bloom Intensity");
@@ -360,6 +366,12 @@ namespace Snow
 
         protected override void Draw(GameTime gameTime)
         {
+            // Begin ImGui
+            _imGuiRenderer.BeginLayout(gameTime);
+            
+            // Sample ImGui window
+            ImGuiNET.ImGui.ShowDemoWindow();
+
             _postProcessing.BeginGameRender();
 
             GraphicsDevice.Clear(new Color(24, 22, 43));
@@ -414,6 +426,9 @@ namespace Snow
             }
 
             _canvasUI.Draw(_graphicsManager.SpriteBatch);
+
+            // End ImGui
+            _imGuiRenderer.EndLayout();
 
             base.Draw(gameTime);
         }
