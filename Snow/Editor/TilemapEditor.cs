@@ -87,38 +87,6 @@ namespace Snow.Editor
             }
         }
 
-        public void LoadTileset(string path)
-        {
-            try
-            {
-                if (_tilesetTexture != null)
-                {
-                    _tilesetTexture.Dispose();
-                    if (_tilesetTexturePtr != IntPtr.Zero)
-                    {
-                        _imGuiRenderer.UnbindTexture(_tilesetTexturePtr);
-                    }
-                }
-                
-                using (FileStream stream = new FileStream(path, FileMode.Open))
-                {
-                    _tilesetTexture = Texture2D.FromStream(_graphicsDevice, stream);
-                }
-                
-                _tilesetPath = path;
-                _tilesPerRow = _tilesetTexture.Width / _tileSize;
-                _tilesPerColumn = _tilesetTexture.Height / _tileSize;
-                
-                _tilesetTexturePtr = _imGuiRenderer.BindTexture(_tilesetTexture);
-                
-                SetStatusMessage($"Tileset loaded: {Path.GetFileName(path)}", false);
-            }
-            catch (Exception ex)
-            {
-                SetStatusMessage($"Failed to load tileset: {ex.Message}", true);
-            }
-        }
-
         public void NewMap(int width, int height, int tileSize)
         {
             _gridWidth = width;
@@ -168,62 +136,176 @@ namespace Snow.Editor
             }
         }
 
-        public void LoadMap(string path)
+       public void LoadMap(string path)
+{
+    try
+    {
+        string json = File.ReadAllText(path);
+        using JsonDocument doc = JsonDocument.Parse(json);
+        JsonElement root = doc.RootElement;
+        
+        _tileSize = root.GetProperty("tile_size").GetInt32();
+        _gridWidth = root.GetProperty("grid_width").GetInt32();
+        _gridHeight = root.GetProperty("grid_height").GetInt32();
+        
+        // Reinitialize arrays with correct size
+        _worldData = new int[_gridHeight][];
+        _collisionData = new bool[_gridHeight][];
+        
+        // Load world data
+        int y = 0;
+        foreach (JsonElement row in root.GetProperty("world_data").EnumerateArray())
+        {
+            if (y >= _gridHeight) break;
+            
+            _worldData[y] = new int[_gridWidth];
+            int x = 0;
+            foreach (JsonElement tile in row.EnumerateArray())
+            {
+                if (x >= _gridWidth) break;
+                
+                _worldData[y][x] = tile.GetInt32();
+                x++;
+            }
+            
+            while (x < _gridWidth)
+            {
+                _worldData[y][x] = 0;
+                x++;
+            }
+            
+            y++;
+        }
+        
+        while (y < _gridHeight)
+        {
+            _worldData[y] = new int[_gridWidth];
+            for (int x = 0; x < _gridWidth; x++)
+            {
+                _worldData[y][x] = 0;
+            }
+            y++;
+        }
+        
+        // Load collision data
+        y = 0;
+        foreach (JsonElement row in root.GetProperty("collision_data").EnumerateArray())
+        {
+            if (y >= _gridHeight) break;
+            
+            _collisionData[y] = new bool[_gridWidth];
+            int x = 0;
+            foreach (JsonElement tile in row.EnumerateArray())
+            {
+                if (x >= _gridWidth) break;
+                
+                _collisionData[y][x] = tile.GetBoolean();
+                x++;
+            }
+            
+            while (x < _gridWidth)
+            {
+                _collisionData[y][x] = false;
+                x++;
+            }
+            
+            y++;
+        }
+        
+        while (y < _gridHeight)
+        {
+            _collisionData[y] = new bool[_gridWidth];
+            for (int x = 0; x < _gridWidth; x++)
+            {
+                _collisionData[y][x] = false;
+            }
+            y++;
+        }
+        
+        // CRITICAL: Recalculate tileset info if tileset is loaded
+        if (_tilesetTexture != null && _tileSize > 0)
+        {
+            _tilesPerRow = _tilesetTexture.Width / _tileSize;
+            _tilesPerColumn = _tilesetTexture.Height / _tileSize;
+            System.Console.WriteLine($"[TilemapEditor] Recalculated - TilesPerRow: {_tilesPerRow}, TilesPerColumn: {_tilesPerColumn}");
+        }
+        else
+        {
+            System.Console.WriteLine($"[TilemapEditor] WARNING: Tileset not loaded or invalid tile size!");
+        }
+        
+        _currentMapPath = path;
+        _hasUnsavedChanges = false;
+        _autoSaveTimer = 0f;
+        
+        SetStatusMessage($"Map loaded: {Path.GetFileName(path)}", false);
+        
+        // Debug output
+        System.Console.WriteLine($"[TilemapEditor] Loaded map: {_gridWidth}x{_gridHeight}, TileSize: {_tileSize}");
+        System.Console.WriteLine($"[TilemapEditor] TilesPerRow: {_tilesPerRow}, TilesPerColumn: {_tilesPerColumn}");
+        // if (_worldData.Length > 0 && _worldData[0].Length >= 10)
+        // {
+        //     System.Console.WriteLine($"[TilemapEditor] First 10 tiles: {string.Join(", ", _worldData[0].Take(10))}");
+        // }
+    }
+    catch (Exception ex)
+    {
+        SetStatusMessage($"Failed to load map: {ex.Message}", true);
+        System.Console.WriteLine($"[TilemapEditor] Error loading map: {ex.Message}");
+        System.Console.WriteLine($"[TilemapEditor] Stack trace: {ex.StackTrace}");
+    }
+}
+        
+        public void LoadTileset(string path)
         {
             try
             {
-                string json = File.ReadAllText(path);
-                using JsonDocument doc = JsonDocument.Parse(json);
-                JsonElement root = doc.RootElement;
-                
-                _tileSize = root.GetProperty("tile_size").GetInt32();
-                _gridWidth = root.GetProperty("grid_width").GetInt32();
-                _gridHeight = root.GetProperty("grid_height").GetInt32();
-                
-                _worldData = new int[_gridHeight][];
-                _collisionData = new bool[_gridHeight][];
-                
-                int y = 0;
-                foreach (JsonElement row in root.GetProperty("world_data").EnumerateArray())
+                if (_tilesetTexture != null)
                 {
-                    _worldData[y] = new int[_gridWidth];
-                    int x = 0;
-                    foreach (JsonElement tile in row.EnumerateArray())
+                    _tilesetTexture.Dispose();
+                    if (_tilesetTexturePtr != IntPtr.Zero)
                     {
-                        _worldData[y][x] = tile.GetInt32();
-                        x++;
+                        _imGuiRenderer.UnbindTexture(_tilesetTexturePtr);
+                        _tilesetTexturePtr = IntPtr.Zero;
                     }
-                    y++;
                 }
                 
-                y = 0;
-                foreach (JsonElement row in root.GetProperty("collision_data").EnumerateArray())
-                {
-                    _collisionData[y] = new bool[_gridWidth];
-                    int x = 0;
-                    foreach (JsonElement tile in row.EnumerateArray())
-                    {
-                        _collisionData[y][x] = tile.GetBoolean();
-                        x++;
-                    }
-                    y++;
-                }
+                _tilesetTexture = LoadTextureForImGui(path);
                 
-                if (!string.IsNullOrEmpty(_tilesetPath))
-                {
-                    _tilesPerRow = _tilesetTexture.Width / _tileSize;
-                    _tilesPerColumn = _tilesetTexture.Height / _tileSize;
-                }
+                _tilesetPath = path;
+                _tilesPerRow = _tilesetTexture.Width / _tileSize;
+                _tilesPerColumn = _tilesetTexture.Height / _tileSize;
                 
-                _currentMapPath = path;
-                _hasUnsavedChanges = false;
-                _autoSaveTimer = 0f;
+                _tilesetTexturePtr = _imGuiRenderer.BindTexture(_tilesetTexture);
                 
-                SetStatusMessage($"Map loaded: {Path.GetFileName(path)}", false);
+                SetStatusMessage($"Tileset loaded: {Path.GetFileName(path)}", false);
             }
             catch (Exception ex)
             {
-                SetStatusMessage($"Failed to load map: {ex.Message}", true);
+                SetStatusMessage($"Failed to load tileset: {ex.Message}", true);
+            }
+        }
+
+        private Texture2D LoadTextureForImGui(string path)
+        {
+            using (FileStream stream = new FileStream(path, FileMode.Open))
+            {
+                Texture2D tempTexture = Texture2D.FromStream(_graphicsDevice, stream);
+                
+                Texture2D texture = new Texture2D(
+                    _graphicsDevice,
+                    tempTexture.Width,
+                    tempTexture.Height,
+                    false,
+                    SurfaceFormat.Color
+                );
+                
+                var data = new Microsoft.Xna.Framework.Color[tempTexture.Width * tempTexture.Height];
+                tempTexture.GetData(data);
+                texture.SetData(data);
+                
+                tempTexture.Dispose();
+                return texture;
             }
         }
 
@@ -233,7 +315,7 @@ namespace Snow.Editor
             {
                 _statusMessageTimer -= 1f / 60f;
             }
-            
+
             if (_hasUnsavedChanges && _autoSaveTimer > 0)
             {
                 _autoSaveTimer -= 1f / 60f;
@@ -242,7 +324,7 @@ namespace Snow.Editor
                     SaveMap(_currentMapPath);
                 }
             }
-            
+
             _ui.Render();
         }
 

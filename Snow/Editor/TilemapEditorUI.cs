@@ -376,74 +376,131 @@ namespace Snow.Editor
         }
 
         private void RenderTilemapView()
+{
+    ImGui.BeginChild("TilemapView", new Vector2(0, 0), ImGuiChildFlags.Border, ImGuiWindowFlags.HorizontalScrollbar);
+    
+    var drawList = ImGui.GetWindowDrawList();
+    var canvasPos = ImGui.GetCursorScreenPos();
+    var mousePos = ImGui.GetMousePos();
+    var canvasSize = ImGui.GetContentRegionAvail();
+    
+    // Draw background
+    drawList.AddRectFilled(canvasPos, 
+        new Vector2(canvasPos.X + canvasSize.X, canvasPos.Y + canvasSize.Y),
+        ImGui.GetColorU32(new Vector4(0.15f, 0.15f, 0.15f, 1.0f)));
+    
+    int displayTileSize = (int)(_editor.TileSize * _editor.Zoom);
+    
+    // Calculate viewport bounds (320x180 camera view)
+    float viewportWidth = 320f * _editor.Zoom;
+    float viewportHeight = 180f * _editor.Zoom;
+    Vector2 viewportPos = new Vector2(
+        canvasPos.X + _editor.ViewportScroll.X,
+        canvasPos.Y + _editor.ViewportScroll.Y
+    );
+    
+    // Draw viewport outline (320x180 camera bounds)
+    drawList.AddRect(
+        viewportPos,
+        new Vector2(viewportPos.X + viewportWidth, viewportPos.Y + viewportHeight),
+        ImGui.GetColorU32(new Vector4(0.0f, 1.0f, 1.0f, 1.0f)), // Cyan color
+        0f,
+        ImDrawFlags.None,
+        3f // Thick line
+    );
+    
+    // Draw tiles
+    for (int y = 0; y < _editor.GridHeight; y++)
+    {
+        for (int x = 0; x < _editor.GridWidth; x++)
         {
-            ImGui.BeginChild("TilemapView", new Vector2(0, 0), ImGuiChildFlags.Border, ImGuiWindowFlags.HorizontalScrollbar);
+            Vector2 tilePos = new Vector2(
+                canvasPos.X + x * displayTileSize + _editor.ViewportScroll.X,
+                canvasPos.Y + y * displayTileSize + _editor.ViewportScroll.Y
+            );
             
-            var drawList = ImGui.GetWindowDrawList();
-            var canvasPos = ImGui.GetCursorScreenPos();
-            var mousePos = ImGui.GetMousePos();
+            Vector2 tileSizeVec = new Vector2(displayTileSize, displayTileSize);
             
-            int displayTileSize = (int)(_editor.TileSize * _editor.Zoom);
+            // Draw grid lines
+            drawList.AddRect(tilePos, tilePos + tileSizeVec, 
+                ImGui.GetColorU32(new Vector4(0.3f, 0.3f, 0.3f, 0.3f)));
             
-            for (int y = 0; y < _editor.GridHeight; y++)
+            int tileId = _editor.WorldData[y][x];
+            
+            if (tileId > 0 && _editor.TilesetTexture != null)
             {
-                for (int x = 0; x < _editor.GridWidth; x++)
+                int tileIndex = tileId - 1;
+                int tilesPerRow = _editor.TilesPerRow;
+                int tilesPerColumn = _editor.TilesPerColumn;
+                
+                if (tileIndex >= 0 && tileIndex < (tilesPerRow * tilesPerColumn))
                 {
-                    Vector2 tilePos = new Vector2(
-                        canvasPos.X + x * displayTileSize + _editor.ViewportScroll.X,
-                        canvasPos.Y + y * displayTileSize + _editor.ViewportScroll.Y
+                    int tx = tileIndex % tilesPerRow;
+                    int ty = tileIndex / tilesPerRow;
+                    
+                    // Calculate pixel coordinates in the tileset
+                    float pixelX = tx * _editor.TileSize;
+                    float pixelY = ty * _editor.TileSize;
+                    
+                    // Convert to UV coordinates (0.0 to 1.0)
+                    float uvX0 = pixelX / (float)_editor.TilesetTexture.Width;
+                    float uvY0 = pixelY / (float)_editor.TilesetTexture.Height;
+                    float uvX1 = (pixelX + _editor.TileSize) / (float)_editor.TilesetTexture.Width;
+                    float uvY1 = (pixelY + _editor.TileSize) / (float)_editor.TilesetTexture.Height;
+                    
+                    Vector2 uv0 = new Vector2(uvX0, uvY0);
+                    Vector2 uv1 = new Vector2(uvX1, uvY1);
+                    
+                    // Draw the tile
+                    drawList.AddImage(
+                        _editor.TilesetTexturePtr, 
+                        tilePos, 
+                        tilePos + tileSizeVec, 
+                        uv0, 
+                        uv1
                     );
-                    
-                    Vector2 tileSize = new Vector2(displayTileSize, displayTileSize);
-                    
-                    drawList.AddRect(tilePos, tilePos + tileSize, ImGui.GetColorU32(new Vector4(0.2f, 0.2f, 0.2f, 0.5f)));
-                    
-                    int tileId = _editor.WorldData[y][x];
-                    
-                    if (tileId > 0 && _editor.TilesetTexture != null)
-                    {
-                        int tileIndex = tileId - 1;
-                        int tx = tileIndex % _editor.TilesPerRow;
-                        int ty = tileIndex / _editor.TilesPerRow;
-                        
-                        Vector2 uv0 = new Vector2(
-                            (float)(tx * _editor.TileSize) / _editor.TilesetTexture.Width,
-                            (float)(ty * _editor.TileSize) / _editor.TilesetTexture.Height
-                        );
-                        
-                        Vector2 uv1 = new Vector2(
-                            (float)((tx + 1) * _editor.TileSize) / _editor.TilesetTexture.Width,
-                            (float)((ty + 1) * _editor.TileSize) / _editor.TilesetTexture.Height
-                        );
-                        
-                        drawList.AddImage(_editor.TilesetTexturePtr, tilePos, tilePos + tileSize, uv0, uv1);
-                    }
-                    
-                    if (_editor.CollisionData[y][x])
-                    {
-                        drawList.AddRectFilled(tilePos, tilePos + tileSize, 
-                            ImGui.GetColorU32(new Vector4(1.0f, 0.0f, 0.0f, 0.3f)));
-                    }
                 }
             }
             
-            if (ImGui.IsWindowHovered())
+            // Draw collision overlay
+            if (_editor.CollisionData[y][x])
             {
-                HandleMapInput(canvasPos, mousePos, displayTileSize);
+                drawList.AddRectFilled(tilePos, tilePos + tileSizeVec, 
+                    ImGui.GetColorU32(new Vector4(1.0f, 0.0f, 0.0f, 0.3f)));
             }
-            
-            ImGui.Dummy(new Vector2(_editor.GridWidth * displayTileSize, _editor.GridHeight * displayTileSize));
-            
-            ImGui.EndChild();
         }
-
+    }
+    
+    // Draw viewport outline again on top so it's always visible
+    drawList.AddRect(
+        viewportPos,
+        new Vector2(viewportPos.X + viewportWidth, viewportPos.Y + viewportHeight),
+        ImGui.GetColorU32(new Vector4(0.0f, 1.0f, 1.0f, 0.8f)), // Cyan color
+        0f,
+        ImDrawFlags.None,
+        2f
+    );
+    
+    if (ImGui.IsWindowHovered())
+    {
+        HandleMapInput(canvasPos, mousePos, displayTileSize);
+    }
+    
+    // Set proper scroll area size
+    float totalWidth = _editor.GridWidth * displayTileSize + 100f;
+    float totalHeight = _editor.GridHeight * displayTileSize + 100f;
+    ImGui.Dummy(new Vector2(totalWidth, totalHeight));
+    
+    ImGui.EndChild();
+}
+       
         private void HandleMapInput(Vector2 canvasPos, Vector2 mousePos, int displayTileSize)
         {
             if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) || ImGui.IsMouseClicked(ImGuiMouseButton.Right))
             {
                 int gridX = (int)((mousePos.X - canvasPos.X - _editor.ViewportScroll.X) / displayTileSize);
                 int gridY = (int)((mousePos.Y - canvasPos.Y - _editor.ViewportScroll.Y) / displayTileSize);
-                
+
                 if (gridX >= 0 && gridX < _editor.GridWidth && gridY >= 0 && gridY < _editor.GridHeight)
                 {
                     if (_editor.CollisionMode)
@@ -458,12 +515,12 @@ namespace Snow.Editor
                     }
                 }
             }
-            
+
             if (ImGui.IsMouseDragging(ImGuiMouseButton.Left) || ImGui.IsMouseDragging(ImGuiMouseButton.Right))
             {
                 int gridX = (int)((mousePos.X - canvasPos.X - _editor.ViewportScroll.X) / displayTileSize);
                 int gridY = (int)((mousePos.Y - canvasPos.Y - _editor.ViewportScroll.Y) / displayTileSize);
-                
+
                 if (gridX >= 0 && gridX < _editor.GridWidth && gridY >= 0 && gridY < _editor.GridHeight)
                 {
                     if (_editor.CollisionMode)
@@ -478,7 +535,7 @@ namespace Snow.Editor
                     }
                 }
             }
-            
+
             if (ImGui.IsMouseDragging(ImGuiMouseButton.Middle))
             {
                 var delta = ImGui.GetMouseDragDelta(ImGuiMouseButton.Middle);
@@ -488,7 +545,7 @@ namespace Snow.Editor
                 );
                 ImGui.ResetMouseDragDelta(ImGuiMouseButton.Middle);
             }
-            
+
             float wheel = ImGui.GetIO().MouseWheel;
             if (wheel != 0)
             {

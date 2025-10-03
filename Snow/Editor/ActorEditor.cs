@@ -1,5 +1,6 @@
 using ImGuiNET;
 using Microsoft.Xna.Framework.Graphics;
+
 using Snow.Engine;
 using System;
 using System.Collections.Generic;
@@ -243,17 +244,37 @@ namespace Snow.Editor
             {
                 if (File.Exists(path))
                 {
-                    using (FileStream stream = new FileStream(path, FileMode.Open))
-                    {
-                        Texture2D texture = Texture2D.FromStream(_graphicsDevice, stream);
-                        _loadedTextures[path] = texture;
-                        _texturePointers[path] = _imGuiRenderer.BindTexture(texture);
-                    }
+                    Texture2D texture = LoadTextureForImGui(path);
+                    _loadedTextures[path] = texture;
+                    _texturePointers[path] = _imGuiRenderer.BindTexture(texture);
                 }
             }
             catch (Exception ex)
             {
                 System.Console.WriteLine($"Failed to load texture {path}: {ex.Message}");
+            }
+        }
+
+        private Texture2D LoadTextureForImGui(string path)
+        {
+            using (FileStream stream = new FileStream(path, FileMode.Open))
+            {
+                Texture2D tempTexture = Texture2D.FromStream(_graphicsDevice, stream);
+                
+                Texture2D texture = new Texture2D(
+                    _graphicsDevice,
+                    tempTexture.Width,
+                    tempTexture.Height,
+                    false,
+                    SurfaceFormat.Color
+                );
+                
+                var data = new Microsoft.Xna.Framework.Color[tempTexture.Width * tempTexture.Height];
+                tempTexture.GetData(data);
+                texture.SetData(data);
+                
+                tempTexture.Dispose();
+                return texture;
             }
         }
 

@@ -59,17 +59,19 @@ namespace Snow.Editor
                 _currentScenePath = scenePath;
                 _currentScene = SceneParser.ParseScene(scenePath);
                 
-                _actorEditor.LoadSceneData(_currentScene, scenePath);
+                if (!string.IsNullOrEmpty(_currentScene.Tileset) && File.Exists(_currentScene.Tileset))
+                {
+                    _tilemapEditor.LoadTileset(_currentScene.Tileset);
+                    System.Console.WriteLine($"[Editor] Tileset loaded first: {_currentScene.Tileset}");
+                }
                 
                 if (!string.IsNullOrEmpty(_currentScene.Tilemap) && File.Exists(_currentScene.Tilemap))
                 {
                     _tilemapEditor.LoadMap(_currentScene.Tilemap);
-                    
-                    if (!string.IsNullOrEmpty(_currentScene.Tileset) && File.Exists(_currentScene.Tileset))
-                    {
-                        _tilemapEditor.LoadTileset(_currentScene.Tileset);
-                    }
+                    System.Console.WriteLine($"[Editor] Map loaded after tileset: {_currentScene.Tilemap}");
                 }
+                
+                _actorEditor.LoadSceneData(_currentScene, scenePath);
                 
                 SetupFileWatchers();
                 
