@@ -1,6 +1,8 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace Snow.Engine
 {
@@ -197,10 +199,12 @@ namespace Snow.Engine
             if (string.IsNullOrEmpty(colorString))
                 return Color.Black;
 
+            colorString = colorString.Trim();
+
             if (colorString.StartsWith("#"))
             {
                 colorString = colorString.Substring(1);
-                
+
                 if (colorString.Length == 6)
                 {
                     int r = System.Convert.ToInt32(colorString.Substring(0, 2), 16);
@@ -218,7 +222,72 @@ namespace Snow.Engine
                 }
             }
 
+            if (colorString.StartsWith("rgba", StringComparison.OrdinalIgnoreCase))
+            {
+                var components = ParseColorComponents(colorString, expectedCount: 4);
+                if (components != null)
+                {
+                    byte r = (byte)Math.Clamp((int)Math.Round(components.Value.Item1), 0, 255);
+                    byte g = (byte)Math.Clamp((int)Math.Round(components.Value.Item2), 0, 255);
+                    byte b = (byte)Math.Clamp((int)Math.Round(components.Value.Item3), 0, 255);
+
+                    float alphaComponent = components.Value.Item4;
+                    byte a = alphaComponent <= 1f
+                        ? (byte)Math.Clamp((int)Math.Round(alphaComponent * 255f), 0, 255)
+                        : (byte)Math.Clamp((int)Math.Round(alphaComponent), 0, 255);
+
+                    return new Color(r, g, b, a);
+                }
+            }
+
+            if (colorString.StartsWith("rgb", StringComparison.OrdinalIgnoreCase))
+            {
+                var components = ParseColorComponents(colorString, expectedCount: 3);
+                if (components != null)
+                {
+                    byte r = (byte)Math.Clamp((int)Math.Round(components.Value.Item1), 0, 255);
+                    byte g = (byte)Math.Clamp((int)Math.Round(components.Value.Item2), 0, 255);
+                    byte b = (byte)Math.Clamp((int)Math.Round(components.Value.Item3), 0, 255);
+
+                    return new Color(r, g, b);
+                }
+            }
+
             return Color.Black;
+        }
+
+        private (float, float, float, float)? ParseColorComponents(string value, int expectedCount)
+        {
+            int openParen = value.IndexOf('(');
+            int closeParen = value.IndexOf(')');
+
+            if (openParen == -1 || closeParen == -1 || closeParen <= openParen)
+                return null;
+
+            var components = value.Substring(openParen + 1, closeParen - openParen - 1)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries);
+
+            if (components.Length != expectedCount)
+                return null;
+
+            float ParseComponent(string component)
+            {
+                return float.Parse(component.Trim(), CultureInfo.InvariantCulture);
+            }
+
+            try
+            {
+                float r = ParseComponent(components[0]);
+                float g = ParseComponent(components[1]);
+                float b = ParseComponent(components[2]);
+                float a = expectedCount == 4 ? ParseComponent(components[3]) : 255f;
+
+                return (r, g, b, a);
+            }
+            catch (FormatException)
+            {
+                return null;
+            }
         }
 
         public void Update(GameTime gameTime)
