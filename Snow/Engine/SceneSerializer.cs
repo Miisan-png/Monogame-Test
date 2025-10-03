@@ -72,6 +72,30 @@ namespace Snow.Engine
             if (entity.Animations != null && entity.Animations.Count > 0)
                 WriteProperty(sb, "animations", FormatDictionary(entity.Animations));
             
+            if (entity.CollisionShape != null)
+            {
+                sb.Append("collision_shape = {");
+                sb.Append($"type: \"{entity.CollisionShape.Type}\", ");
+                sb.Append($"offset_x: {entity.CollisionShape.OffsetX}, ");
+                sb.Append($"offset_y: {entity.CollisionShape.OffsetY}, ");
+                sb.Append($"width: {entity.CollisionShape.Width}, ");
+                sb.Append($"height: {entity.CollisionShape.Height}, ");
+                sb.Append($"radius: {entity.CollisionShape.Radius}");
+                sb.AppendLine("}");
+            }
+            
+            if (entity.SpriteData != null)
+            {
+                sb.Append("sprite_data = {");
+                if (!string.IsNullOrEmpty(entity.SpriteData.TexturePath))
+                    sb.Append($"texture: \"{entity.SpriteData.TexturePath}\", ");
+                sb.Append($"origin_x: {entity.SpriteData.OriginX}, ");
+                sb.Append($"origin_y: {entity.SpriteData.OriginY}, ");
+                sb.Append($"scale_x: {entity.SpriteData.ScaleX}, ");
+                sb.Append($"scale_y: {entity.SpriteData.ScaleY}");
+                sb.AppendLine("}");
+            }
+            
             WriteProperties(sb, entity.Properties);
             sb.AppendLine();
         }

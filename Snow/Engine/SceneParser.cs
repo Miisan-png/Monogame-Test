@@ -41,11 +41,45 @@ namespace Snow.Engine
         public Dictionary<string, object> Properties { get; set; }
         public string Sprite { get; set; }
         public Dictionary<string, List<string>> Animations { get; set; }
+        public CollisionShape CollisionShape { get; set; }
+        public SpriteData SpriteData { get; set; }
 
         public EntityData()
         {
             Properties = new Dictionary<string, object>();
             Animations = new Dictionary<string, List<string>>();
+        }
+    }
+
+    public class CollisionShape
+    {
+        public string Type { get; set; }
+        public float OffsetX { get; set; }
+        public float OffsetY { get; set; }
+        public float Width { get; set; }
+        public float Height { get; set; }
+        public float Radius { get; set; }
+
+        public CollisionShape()
+        {
+            Type = "box";
+            Width = 16;
+            Height = 24;
+        }
+    }
+
+    public class SpriteData
+    {
+        public string TexturePath { get; set; }
+        public float OriginX { get; set; }
+        public float OriginY { get; set; }
+        public float ScaleX { get; set; }
+        public float ScaleY { get; set; }
+
+        public SpriteData()
+        {
+            ScaleX = 1f;
+            ScaleY = 1f;
         }
     }
 
@@ -281,8 +315,50 @@ namespace Snow.Engine
                     break;
                 case "animations": entity.Animations = ParseDictionary(value); break;
                 case "properties": entity.Properties = ParseProperties(value); break;
+                case "collision_shape": entity.CollisionShape = ParseCollisionShape(value); break;
+                case "sprite_data": entity.SpriteData = ParseSpriteData(value); break;
                 default: entity.Properties[key] = ParseValue(value); break;
             }
+        }
+
+        private static CollisionShape ParseCollisionShape(string value)
+        {
+            var shape = new CollisionShape();
+            var props = ParseProperties(value);
+            
+            if (props.ContainsKey("type"))
+                shape.Type = props["type"].ToString();
+            if (props.ContainsKey("offset_x"))
+                shape.OffsetX = Convert.ToSingle(props["offset_x"]);
+            if (props.ContainsKey("offset_y"))
+                shape.OffsetY = Convert.ToSingle(props["offset_y"]);
+            if (props.ContainsKey("width"))
+                shape.Width = Convert.ToSingle(props["width"]);
+            if (props.ContainsKey("height"))
+                shape.Height = Convert.ToSingle(props["height"]);
+            if (props.ContainsKey("radius"))
+                shape.Radius = Convert.ToSingle(props["radius"]);
+                
+            return shape;
+        }
+
+        private static SpriteData ParseSpriteData(string value)
+        {
+            var sprite = new SpriteData();
+            var props = ParseProperties(value);
+            
+            if (props.ContainsKey("texture"))
+                sprite.TexturePath = props["texture"].ToString();
+            if (props.ContainsKey("origin_x"))
+                sprite.OriginX = Convert.ToSingle(props["origin_x"]);
+            if (props.ContainsKey("origin_y"))
+                sprite.OriginY = Convert.ToSingle(props["origin_y"]);
+            if (props.ContainsKey("scale_x"))
+                sprite.ScaleX = Convert.ToSingle(props["scale_x"]);
+            if (props.ContainsKey("scale_y"))
+                sprite.ScaleY = Convert.ToSingle(props["scale_y"]);
+                
+            return sprite;
         }
 
         private static void ParseEmitterProperty(ParticleEmitterData emitter, string key, string value)

@@ -58,6 +58,9 @@ namespace Snow
                 Exit();
 
             _gameRenderer.Update(gameTime);
+            
+            float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+            _editor.Update(deltaTime);
 
             base.Update(gameTime);
         }
