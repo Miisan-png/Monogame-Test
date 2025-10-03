@@ -31,7 +31,9 @@ namespace Snow
         private float _physicsParticleSpawnTimer;
         private KeyboardState _previousKeyboard;
         
+        // private Color _canvasModulate = new Color(0xc5, 0x00, 0xa8, 0xff);
         private Color _canvasModulate = new Color(0xc5, 0x00, 0xa8, 0xff);
+
         private bool _gameStarted = false;
         private bool _isPaused = false;
 
@@ -55,7 +57,7 @@ namespace Snow
                     var scene = _sceneManager.LoadScene("scenes/forest_1.scene");
                     _console.LogSuccess($"Level reloaded: {scene.Name}");
 
-                    _player = new Player(scene.PlayerSpawnPosition, _graphicsDevice, _input, _graphicsManager, _particles);
+                    _player = new Player(scene.PlayerSpawnPosition, _graphicsDevice, _input, _graphicsManager, _particles, _camera);
 
                     factoryContext.Tilemap = scene.Tilemap;
                     
@@ -134,7 +136,8 @@ namespace Snow
                 var scene = _sceneManager.LoadScene("scenes/forest_1.scene");
                 _console.LogSuccess($"Scene loaded: {scene.Name}");
 
-                _player = new Player(scene.PlayerSpawnPosition, _graphicsDevice, _input, _graphicsManager, _particles);
+                _player = new Player(scene.PlayerSpawnPosition, _graphicsDevice, _input, _graphicsManager, _particles, _camera);
+
                 _console.Log($"Player spawned at ({scene.PlayerSpawnPosition.X}, {scene.PlayerSpawnPosition.Y})");
 
                 factoryContext.Tilemap = scene.Tilemap;

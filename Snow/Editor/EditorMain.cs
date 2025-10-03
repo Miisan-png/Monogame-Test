@@ -126,7 +126,7 @@ namespace Snow.Editor
                             LoadSceneFile(path);
                         }
                     }
-                    
+
                     if (ImGui.MenuItem("Save Scene", null, false, _currentScene != null))
                     {
                         if (!string.IsNullOrEmpty(_currentScenePath))
@@ -135,9 +135,9 @@ namespace Snow.Editor
                             System.Console.WriteLine($"[Editor] Scene saved: {_currentScenePath}");
                         }
                     }
-                    
+
                     ImGui.Separator();
-                    
+
                     if (ImGui.MenuItem("Reload Scene", "Ctrl+R", false, _currentScene != null))
                     {
                         if (!string.IsNullOrEmpty(_currentScenePath))
@@ -146,10 +146,10 @@ namespace Snow.Editor
                             _gameRenderer.ReloadLevel();
                         }
                     }
-                    
+
                     ImGui.EndMenu();
                 }
-                
+
                 if (ImGui.BeginMenu("Windows"))
                 {
                     bool viewportOpen = _viewport.IsOpen;
@@ -157,18 +157,18 @@ namespace Snow.Editor
                     {
                         _viewport.IsOpen = !_viewport.IsOpen;
                     }
-                    
+
                     if (ImGui.MenuItem("Tilemap Editor", null, _showTilemapEditor))
                     {
                         _showTilemapEditor = !_showTilemapEditor;
                     }
-                    
+
                     if (ImGui.MenuItem("Actor Editor", null, _showActorEditor))
                     {
                         _showActorEditor = !_showActorEditor;
                         _actorEditor.IsOpen = _showActorEditor;
                     }
-                    
+
                     ImGui.EndMenu();
                 }
                 ImGui.EndMainMenuBar();
@@ -186,6 +186,27 @@ namespace Snow.Editor
                 _actorEditor.Render();
                 _showActorEditor = _actorEditor.IsOpen;
             }
+
+
+            if (ImGui.BeginMenu("Themes"))
+            {
+                if (ImGui.MenuItem("Dark", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Dark))
+                    ThemeManager.ApplyTheme(ThemeManager.Theme.Dark);
+
+                if (ImGui.MenuItem("Light", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Light))
+                    ThemeManager.ApplyTheme(ThemeManager.Theme.Light);
+
+                if (ImGui.MenuItem("Classic", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Classic))
+                    ThemeManager.ApplyTheme(ThemeManager.Theme.Classic);
+
+                if (ImGui.MenuItem("Custom Blue", null, ThemeManager.CurrentTheme == ThemeManager.Theme.CustomBlue))
+                    ThemeManager.ApplyTheme(ThemeManager.Theme.CustomBlue);
+
+                ImGui.EndMenu();
+            }
+            ImGui.EndMainMenuBar();
+
+
         }
 
         private string ShowOpenFileDialog(string extension)
