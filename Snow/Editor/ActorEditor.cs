@@ -39,10 +39,11 @@ namespace Snow.Editor
         private bool _isPlayingAnimation = false;
         private List<string> _currentAnimationFrames = new List<string>();
         
-        // Auto-save functionality
         private bool _hasUnsavedChanges = false;
         private float _autoSaveTimer = 0f;
-        private const float AUTO_SAVE_DELAY = 2.0f; // Save 2 seconds after last edit
+        private const float AUTO_SAVE_DELAY = 2.0f;
+        
+        private Action<string> _onSceneChanged;
 
         public bool IsOpen { get => _isOpen; set => _isOpen = value; }
 
@@ -50,6 +51,11 @@ namespace Snow.Editor
         {
             _graphicsDevice = graphicsDevice;
             _imGuiRenderer = imGuiRenderer;
+        }
+
+        public void SetSceneChangedCallback(Action<string> callback)
+        {
+            _onSceneChanged = callback;
         }
 
         public void LoadSceneData(SceneData sceneData, string scenePath)
@@ -81,6 +87,7 @@ namespace Snow.Editor
                     _hasUnsavedChanges = false;
                     _autoSaveTimer = 0f;
                     System.Console.WriteLine($"[ActorEditor] Scene saved: {_currentScenePath}");
+                    _onSceneChanged?.Invoke(_currentScenePath);
                 }
                 catch (Exception ex)
                 {
@@ -97,7 +104,6 @@ namespace Snow.Editor
 
         public void Update(float deltaTime)
         {
-            // Auto-save logic
             if (_hasUnsavedChanges && _autoSaveTimer > 0)
             {
                 _autoSaveTimer -= deltaTime;
@@ -142,7 +148,6 @@ namespace Snow.Editor
                 return;
             }
 
-            // Show auto-save indicator
             if (_hasUnsavedChanges)
             {
                 ImGui.TextColored(new Vector4(1, 1, 0, 1), $"Auto-saving in {_autoSaveTimer:F1}s...");

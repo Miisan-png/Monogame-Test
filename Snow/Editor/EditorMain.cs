@@ -24,7 +24,14 @@ namespace Snow.Editor
             _viewport = new EditorViewport(gameRenderer);
             _tilemapEditor = new TilemapEditor(gameRenderer, graphicsDevice, imGuiRenderer);
             _actorEditor = new ActorEditor(graphicsDevice, imGuiRenderer);
+            _actorEditor.SetSceneChangedCallback(OnActorEditorSceneChanged);
             _fileWatcher = new MultiFileWatcher();
+        }
+
+        private void OnActorEditorSceneChanged(string scenePath)
+        {
+            System.Console.WriteLine($"[Editor] Actor editor saved scene, reloading game: {scenePath}");
+            _gameRenderer.ReloadLevel();
         }
 
         public void SetGameTexturePtr(System.IntPtr texturePtr)
@@ -44,22 +51,18 @@ namespace Snow.Editor
                 _currentScenePath = scenePath;
                 _currentScene = SceneParser.ParseScene(scenePath);
                 
-                // Load scene into Actor Editor
                 _actorEditor.LoadSceneData(_currentScene, scenePath);
                 
-                // Load tilemap into Tilemap Editor if specified
                 if (!string.IsNullOrEmpty(_currentScene.Tilemap) && File.Exists(_currentScene.Tilemap))
                 {
                     _tilemapEditor.LoadMap(_currentScene.Tilemap);
                     
-                    // Load tileset if specified
                     if (!string.IsNullOrEmpty(_currentScene.Tileset) && File.Exists(_currentScene.Tileset))
                     {
                         _tilemapEditor.LoadTileset(_currentScene.Tileset);
                     }
                 }
                 
-                // Setup file watchers for hot reload
                 SetupFileWatchers();
                 
                 System.Console.WriteLine($"[Editor] Scene loaded: {scenePath}");
@@ -74,13 +77,11 @@ namespace Snow.Editor
         {
             _fileWatcher.ClearWatchers();
             
-            // Watch the scene file
             if (!string.IsNullOrEmpty(_currentScenePath))
             {
                 _fileWatcher.WatchFile(_currentScenePath, OnSceneFileChanged);
             }
             
-            // Watch the tilemap file
             if (_currentScene != null && !string.IsNullOrEmpty(_currentScene.Tilemap))
             {
                 _fileWatcher.WatchFile(_currentScene.Tilemap, OnTilemapFileChanged);
@@ -92,7 +93,6 @@ namespace Snow.Editor
             System.Console.WriteLine($"[Editor] Scene file changed, reloading: {filePath}");
             LoadSceneFile(filePath);
             
-            // Reload the game viewport
             _gameRenderer.ReloadLevel();
         }
 
@@ -100,13 +100,11 @@ namespace Snow.Editor
         {
             System.Console.WriteLine($"[Editor] Tilemap file changed, reloading: {filePath}");
             
-            // Reload tilemap in editor
             if (File.Exists(filePath))
             {
                 _tilemapEditor.LoadMap(filePath);
             }
             
-            // Reload the game viewport
             _gameRenderer.ReloadLevel();
         }
 
@@ -171,6 +169,24 @@ namespace Snow.Editor
 
                     ImGui.EndMenu();
                 }
+
+                if (ImGui.BeginMenu("Themes"))
+                {
+                    if (ImGui.MenuItem("Dark", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Dark))
+                        ThemeManager.ApplyTheme(ThemeManager.Theme.Dark);
+
+                    if (ImGui.MenuItem("Light", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Light))
+                        ThemeManager.ApplyTheme(ThemeManager.Theme.Light);
+
+                    if (ImGui.MenuItem("Classic", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Classic))
+                        ThemeManager.ApplyTheme(ThemeManager.Theme.Classic);
+
+                    if (ImGui.MenuItem("Custom Blue", null, ThemeManager.CurrentTheme == ThemeManager.Theme.CustomBlue))
+                        ThemeManager.ApplyTheme(ThemeManager.Theme.CustomBlue);
+
+                    ImGui.EndMenu();
+                }
+                
                 ImGui.EndMainMenuBar();
             }
 
@@ -186,27 +202,6 @@ namespace Snow.Editor
                 _actorEditor.Render();
                 _showActorEditor = _actorEditor.IsOpen;
             }
-
-
-            if (ImGui.BeginMenu("Themes"))
-            {
-                if (ImGui.MenuItem("Dark", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Dark))
-                    ThemeManager.ApplyTheme(ThemeManager.Theme.Dark);
-
-                if (ImGui.MenuItem("Light", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Light))
-                    ThemeManager.ApplyTheme(ThemeManager.Theme.Light);
-
-                if (ImGui.MenuItem("Classic", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Classic))
-                    ThemeManager.ApplyTheme(ThemeManager.Theme.Classic);
-
-                if (ImGui.MenuItem("Custom Blue", null, ThemeManager.CurrentTheme == ThemeManager.Theme.CustomBlue))
-                    ThemeManager.ApplyTheme(ThemeManager.Theme.CustomBlue);
-
-                ImGui.EndMenu();
-            }
-            ImGui.EndMainMenuBar();
-
-
         }
 
         private string ShowOpenFileDialog(string extension)

@@ -1,3 +1,4 @@
+// Snow/GameRenderer.cs
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -31,11 +32,11 @@ namespace Snow
         private float _physicsParticleSpawnTimer;
         private KeyboardState _previousKeyboard;
         
-        // private Color _canvasModulate = new Color(0xc5, 0x00, 0xa8, 0xff);
         private Color _canvasModulate = new Color(0xc5, 0x00, 0xa8, 0xff);
 
         private bool _gameStarted = false;
         private bool _isPaused = false;
+        private string _currentScenePath = "scenes/forest_1.scene";
 
         public RenderTarget2D GameRenderTarget { get; private set; }
         public bool IsGameStarted => _gameStarted;
@@ -43,32 +44,45 @@ namespace Snow
 
         public void ReloadLevel()
         {
-            if (_sceneManager.CurrentScene != null && _gameStarted)
+            if (!_gameStarted) return;
+
+            try
             {
-                try
+                var factoryContext = new EntityFactoryContext
                 {
-                    var factoryContext = new EntityFactoryContext
+                    Input = _input,
+                    Particles = _particles
+                };
+                _sceneManager.SetFactoryContext(factoryContext);
+
+                var scene = _sceneManager.LoadScene(_currentScenePath);
+                _console.LogSuccess($"Level reloaded: {scene.Name}");
+
+                var sceneData = SceneParser.ParseScene(_currentScenePath);
+                EntityData playerSpawnData = null;
+                foreach (var entity in sceneData.Entities)
+                {
+                    if (entity.Id == "playerspawn_1" || entity.Type == "PlayerSpawn")
                     {
-                        Input = _input,
-                        Particles = _particles
-                    };
-                    _sceneManager.SetFactoryContext(factoryContext);
-
-                    var scene = _sceneManager.LoadScene("scenes/forest_1.scene");
-                    _console.LogSuccess($"Level reloaded: {scene.Name}");
-
-                    _player = new Player(scene.PlayerSpawnPosition, _graphicsDevice, _input, _graphicsManager, _particles, _camera);
-
-                    factoryContext.Tilemap = scene.Tilemap;
-                    
-                    _particles.Clear();
-                    _particles.ClearPhysicsParticles();
-                    SpawnInitialFireflies();
+                        playerSpawnData = entity;
+                        break;
+                    }
                 }
-                catch (Exception ex)
+
+                Vector2 currentPlayerPos = _player.Position;
+                _player = new Player(currentPlayerPos, _graphicsDevice, _input, _graphicsManager, _particles, _camera);
+                
+                if (playerSpawnData != null)
                 {
-                    _console.LogError($"Failed to reload level: {ex.Message}");
+                    _player.ApplyCollisionShape(playerSpawnData.CollisionShape);
+                    _player.ApplySpriteData(playerSpawnData.SpriteData);
                 }
+
+                factoryContext.Tilemap = scene.Tilemap;
+            }
+            catch (Exception ex)
+            {
+                _console.LogError($"Failed to reload level: {ex.Message}");
             }
         }
 
@@ -133,10 +147,27 @@ namespace Snow
                 };
                 _sceneManager.SetFactoryContext(factoryContext);
 
-                var scene = _sceneManager.LoadScene("scenes/forest_1.scene");
+                var scene = _sceneManager.LoadScene(_currentScenePath);
                 _console.LogSuccess($"Scene loaded: {scene.Name}");
 
+                var sceneData = SceneParser.ParseScene(_currentScenePath);
+                EntityData playerSpawnData = null;
+                foreach (var entity in sceneData.Entities)
+                {
+                    if (entity.Id == "playerspawn_1" || entity.Type == "PlayerSpawn")
+                    {
+                        playerSpawnData = entity;
+                        break;
+                    }
+                }
+
                 _player = new Player(scene.PlayerSpawnPosition, _graphicsDevice, _input, _graphicsManager, _particles, _camera);
+                
+                if (playerSpawnData != null)
+                {
+                    _player.ApplyCollisionShape(playerSpawnData.CollisionShape);
+                    _player.ApplySpriteData(playerSpawnData.SpriteData);
+                }
 
                 _console.Log($"Player spawned at ({scene.PlayerSpawnPosition.X}, {scene.PlayerSpawnPosition.Y})");
 

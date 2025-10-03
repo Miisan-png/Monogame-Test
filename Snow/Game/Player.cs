@@ -34,6 +34,7 @@ namespace Snow.Game
         private Color _normalColor = Color.White;
         private float _coyoteTimer;
         private float _jumpBufferTimer;
+        private CollisionShape _collisionShape;
 
         public Player(Vector2 position, GraphicsDevice graphicsDevice, InputManager input, GraphicsManager graphics, ParticleSystem particles, Camera camera) : base(position)
         {
@@ -53,6 +54,52 @@ namespace Snow.Game
             _ghostSpawnTimer = 0f;
             _coyoteTimer = 0f;
             _jumpBufferTimer = 0f;
+            
+            _collisionShape = new CollisionShape
+            {
+                Type = "box",
+                OffsetX = 0,
+                OffsetY = 0,
+                Width = 16,
+                Height = 24,
+                Radius = 0
+            };
+        }
+
+        public void ApplyCollisionShape(CollisionShape shape)
+        {
+            if (shape != null)
+            {
+                _collisionShape = new CollisionShape
+                {
+                    Type = shape.Type,
+                    OffsetX = shape.OffsetX,
+                    OffsetY = shape.OffsetY,
+                    Width = shape.Width,
+                    Height = shape.Height,
+                    Radius = shape.Radius
+                };
+                Size = new Vector2(shape.Width, shape.Height);
+            }
+        }
+
+        public void ApplySpriteData(SpriteData spriteData)
+        {
+            if (spriteData != null)
+            {
+                _sprite.Origin = new Vector2(spriteData.OriginX, spriteData.OriginY);
+                Scale = new Vector2(spriteData.ScaleX, spriteData.ScaleY);
+            }
+        }
+
+        public Rectangle GetCollisionBox()
+        {
+            return new Rectangle(
+                (int)(Position.X + _collisionShape.OffsetX),
+                (int)(Position.Y + _collisionShape.OffsetY),
+                (int)_collisionShape.Width,
+                (int)_collisionShape.Height
+            );
         }
 
         private void LoadAnimations()
