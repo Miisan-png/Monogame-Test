@@ -44,7 +44,7 @@ namespace Snow
             io.ConfigFlags |= ImGuiNET.ImGuiConfigFlags.DockingEnable;
 
             _gameRenderer = new GameRenderer(GraphicsDevice, 1280, 720);
-            _editor = new EditorMain(_gameRenderer);
+            _editor = new EditorMain(_gameRenderer, GraphicsDevice, _imGuiRenderer);
 
             _gameTexturePtr = _imGuiRenderer.BindTexture(_gameRenderer.GameRenderTarget);
             _editor.SetGameTexturePtr(_gameTexturePtr);

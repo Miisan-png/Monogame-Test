@@ -13,6 +13,8 @@ namespace Snow.Editor
         private float _zoom = 1.0f;
         private bool _fitToWindow = true;
 
+        public bool IsOpen { get; set; } = true;
+
         public EditorViewport(GameRenderer gameRenderer)
         {
             _gameRenderer = gameRenderer;
@@ -26,8 +28,14 @@ namespace Snow.Editor
 
         public void Render()
         {
+            if (!IsOpen) return;
+
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, System.Numerics.Vector2.Zero);
-            ImGui.Begin("Game Viewport", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse);
+            
+            bool isOpen = IsOpen;
+            ImGui.Begin("Game Viewport", ref isOpen, ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse);
+            IsOpen = isOpen;
+            
             ImGui.PopStyleVar();
 
             if (ImGui.Button(_isPlaying ? "Pause" : "Play"))
@@ -42,6 +50,13 @@ namespace Snow.Editor
             {
                 _isPlaying = false;
                 _gameRenderer.IsPaused = true;
+            }
+
+            ImGui.SameLine();
+            
+            if (ImGui.Button("Reload Level"))
+            {
+                _gameRenderer.ReloadLevel();
             }
 
             ImGui.SameLine();

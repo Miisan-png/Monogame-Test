@@ -39,6 +39,37 @@ namespace Snow
         public bool IsGameStarted => _gameStarted;
         public bool IsPaused { get => _isPaused; set => _isPaused = value; }
 
+        public void ReloadLevel()
+        {
+            if (_sceneManager.CurrentScene != null && _gameStarted)
+            {
+                try
+                {
+                    var factoryContext = new EntityFactoryContext
+                    {
+                        Input = _input,
+                        Particles = _particles
+                    };
+                    _sceneManager.SetFactoryContext(factoryContext);
+
+                    var scene = _sceneManager.LoadScene("scenes/forest_1.scene");
+                    _console.LogSuccess($"Level reloaded: {scene.Name}");
+
+                    _player = new Player(scene.PlayerSpawnPosition, _graphicsDevice, _input, _graphicsManager, _particles);
+
+                    factoryContext.Tilemap = scene.Tilemap;
+                    
+                    _particles.Clear();
+                    _particles.ClearPhysicsParticles();
+                    SpawnInitialFireflies();
+                }
+                catch (Exception ex)
+                {
+                    _console.LogError($"Failed to reload level: {ex.Message}");
+                }
+            }
+        }
+
         public GameRenderer(GraphicsDevice graphicsDevice, int renderWidth, int renderHeight)
         {
             _graphicsDevice = graphicsDevice;
