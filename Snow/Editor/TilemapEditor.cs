@@ -1,52 +1,15 @@
 using ImGuiNET;
-using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
 using System.Text.Json;
-using System.Runtime.InteropServices;
 
 namespace Snow.Editor
 {
     public class TilemapEditor
     {
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
-        private class OpenFileName
-        {
-            public int structSize = 0;
-            public IntPtr dlgOwner = IntPtr.Zero;
-            public IntPtr instance = IntPtr.Zero;
-            public string filter = null;
-            public string customFilter = null;
-            public int maxCustFilter = 0;
-            public int filterIndex = 0;
-            public string file = null;
-            public int maxFile = 0;
-            public string fileTitle = null;
-            public int maxFileTitle = 0;
-            public string initialDir = null;
-            public string title = null;
-            public int flags = 0;
-            public short fileOffset = 0;
-            public short fileExtension = 0;
-            public string defExt = null;
-            public IntPtr custData = IntPtr.Zero;
-            public IntPtr hook = IntPtr.Zero;
-            public string templateName = null;
-            public IntPtr reservedPtr = IntPtr.Zero;
-            public int reserved = 0;
-            public int flagsEx = 0;
-        }
-
-        [DllImport("comdlg32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        private static extern bool GetOpenFileName([In, Out] OpenFileName ofn);
-
-        [DllImport("comdlg32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        private static extern bool GetSaveFileName([In, Out] OpenFileName ofn);
-
         private GameRenderer _gameRenderer;
         private GraphicsDevice _graphicsDevice;
         
@@ -61,13 +24,13 @@ namespace Snow.Editor
         private int _tilesPerRow;
         private int _tilesPerColumn;
         
-        private List<System.Numerics.Vector2> _selectedTiles = new List<System.Numerics.Vector2>();
-        private System.Numerics.Vector2 _selectionStart = System.Numerics.Vector2.Zero;
+        private List<Vector2> _selectedTiles = new List<Vector2>();
+        private Vector2 _selectionStart = Vector2.Zero;
         private bool _isSelecting = false;
         
         private bool _collisionMode = false;
         
-        private System.Numerics.Vector2 _viewportScroll = System.Numerics.Vector2.Zero;
+        private Vector2 _viewportScroll = Vector2.Zero;
         private float _zoom = 2.0f;
         private float _paletteZoom = 2.0f;
         
@@ -80,6 +43,8 @@ namespace Snow.Editor
         
         private IntPtr _tilesetTexturePtr = IntPtr.Zero;
         private MonoGame.ImGuiNet.ImGuiRenderer _imGuiRenderer;
+        
+        private TilemapEditorUI _ui;
 
         public TilemapEditor(GameRenderer gameRenderer, GraphicsDevice graphicsDevice, MonoGame.ImGuiNet.ImGuiRenderer imGuiRenderer)
         {
@@ -88,6 +53,8 @@ namespace Snow.Editor
             _imGuiRenderer = imGuiRenderer;
             
             InitializeGridData();
+            
+            _ui = new TilemapEditorUI(this);
         }
 
         private void InitializeGridData()
@@ -242,432 +209,10 @@ namespace Snow.Editor
                 _statusMessageTimer -= 1f / 60f;
             }
             
-            ImGui.Begin("Tilemap Editor", ImGuiWindowFlags.MenuBar);
-            
-            if (ImGui.BeginMenuBar())
-            {
-                if (ImGui.BeginMenu("File"))
-                {
-                    if (ImGui.MenuItem("New Map"))
-                    {
-                        ImGui.OpenPopup("NewMapPopup");
-                    }
-                    
-                    if (ImGui.MenuItem("Load Tileset"))
-                    {
-                        string path = ShowOpenFileDialog("png");
-                        if (!string.IsNullOrEmpty(path))
-                        {
-                            LoadTileset(path);
-                        }
-                    }
-                    
-                    if (ImGui.MenuItem("Save Map"))
-                    {
-                        string path = ShowSaveFileDialog("json");
-                        if (!string.IsNullOrEmpty(path))
-                        {
-                            SaveMap(path);
-                        }
-                    }
-                    
-                    if (ImGui.MenuItem("Load Map"))
-                    {
-                        string path = ShowOpenFileDialog("json");
-                        if (!string.IsNullOrEmpty(path))
-                        {
-                            LoadMap(path);
-                        }
-                    }
-                    
-                    ImGui.EndMenu();
-                }
-                
-                if (ImGui.BeginMenu("Edit"))
-                {
-                    if (ImGui.MenuItem("Undo", "Ctrl+Z", false, _undoStack.Count > 0))
-                    {
-                        Undo();
-                    }
-                    
-                    if (ImGui.MenuItem("Redo", "Ctrl+Y", false, _redoStack.Count > 0))
-                    {
-                        Redo();
-                    }
-                    
-                    if (ImGui.MenuItem("Clear Map"))
-                    {
-                        ClearMap();
-                    }
-                    
-                    ImGui.EndMenu();
-                }
-                
-                ImGui.EndMenuBar();
-            }
-            
-            if (_statusMessageTimer > 0)
-            {
-                if (_statusMessageIsError)
-                {
-                    ImGui.PushStyleColor(ImGuiCol.Text, new System.Numerics.Vector4(1, 0.3f, 0.3f, 1));
-                }
-                else
-                {
-                    ImGui.PushStyleColor(ImGuiCol.Text, new System.Numerics.Vector4(0.3f, 1, 0.3f, 1));
-                }
-                
-                ImGui.Text(_statusMessage);
-                ImGui.PopStyleColor();
-                ImGui.Separator();
-            }
-            
-            if (ImGui.BeginPopupModal("NewMapPopup", ImGuiWindowFlags.AlwaysAutoResize))
-            {
-                ImGui.InputInt("Width", ref _gridWidth);
-                ImGui.InputInt("Height", ref _gridHeight);
-                ImGui.InputInt("Tile Size", ref _tileSize);
-                
-                if (ImGui.Button("Create"))
-                {
-                    NewMap(_gridWidth, _gridHeight, _tileSize);
-                    ImGui.CloseCurrentPopup();
-                }
-                
-                ImGui.SameLine();
-                
-                if (ImGui.Button("Cancel"))
-                {
-                    ImGui.CloseCurrentPopup();
-                }
-                
-                ImGui.EndPopup();
-            }
-            
-            ImGui.Columns(2);
-            ImGui.SetColumnWidth(0, 320);
-            
-            RenderToolPanel();
-            
-            ImGui.NextColumn();
-            
-            RenderTilemapView();
-            
-            ImGui.Columns(1);
-            
-            ImGui.End();
+            _ui.Render();
         }
 
-        private void RenderToolPanel()
-        {
-            ImGui.BeginChild("ToolPanel", new System.Numerics.Vector2(0, 0), ImGuiChildFlags.Border);
-            
-            ImGui.Text("Tools");
-            ImGui.Separator();
-            
-            if (ImGui.RadioButton("Draw", !_collisionMode))
-            {
-                _collisionMode = false;
-            }
-            
-            if (ImGui.RadioButton("Collision", _collisionMode))
-            {
-                _collisionMode = true;
-            }
-            
-            ImGui.Separator();
-            
-            ImGui.Text($"Grid: {_gridWidth}x{_gridHeight}");
-            ImGui.Text($"Tile Size: {_tileSize}px");
-            ImGui.Text($"Selected Tiles: {_selectedTiles.Count}");
-            
-            ImGui.Separator();
-            
-            ImGui.Text("Tilemap View");
-            ImGui.SliderFloat("Zoom##map", ref _zoom, 0.5f, 4.0f);
-            
-            ImGui.Separator();
-            
-            if (_tilesetTexture != null)
-            {
-                ImGui.Text("Tileset Palette");
-                ImGui.SliderFloat("Zoom##palette", ref _paletteZoom, 1.0f, 4.0f);
-                ImGui.Separator();
-                
-                RenderTilesetPalette();
-            }
-            else
-            {
-                ImGui.Text("No tileset loaded");
-                ImGui.TextWrapped("Load a tileset from File -> Load Tileset");
-            }
-            
-            ImGui.EndChild();
-        }
-
-        private void RenderTilesetPalette()
-        {
-            ImGui.BeginChild("TilesetPalette", new System.Numerics.Vector2(0, 0), ImGuiChildFlags.Border);
-            
-            if (_tilesetTexture == null)
-            {
-                ImGui.EndChild();
-                return;
-            }
-            
-            var drawList = ImGui.GetWindowDrawList();
-            var canvasPos = ImGui.GetCursorScreenPos();
-            var mousePos = ImGui.GetMousePos();
-            
-            int displayTileSize = (int)(_tileSize * _paletteZoom);
-            
-            for (int ty = 0; ty < _tilesPerColumn; ty++)
-            {
-                for (int tx = 0; tx < _tilesPerRow; tx++)
-                {
-                    System.Numerics.Vector2 tilePos = new System.Numerics.Vector2(
-                        canvasPos.X + tx * displayTileSize,
-                        canvasPos.Y + ty * displayTileSize
-                    );
-                    
-                    System.Numerics.Vector2 uv0 = new System.Numerics.Vector2(
-                        (float)(tx * _tileSize) / _tilesetTexture.Width,
-                        (float)(ty * _tileSize) / _tilesetTexture.Height
-                    );
-                    
-                    System.Numerics.Vector2 uv1 = new System.Numerics.Vector2(
-                        (float)((tx + 1) * _tileSize) / _tilesetTexture.Width,
-                        (float)((ty + 1) * _tileSize) / _tilesetTexture.Height
-                    );
-                    
-                    drawList.AddImage(
-                        _tilesetTexturePtr, 
-                        tilePos, 
-                        tilePos + new System.Numerics.Vector2(displayTileSize, displayTileSize), 
-                        uv0, 
-                        uv1
-                    );
-                    
-                    bool isSelected = _selectedTiles.Contains(new System.Numerics.Vector2(tx, ty));
-                    
-                    if (isSelected)
-                    {
-                        drawList.AddRect(
-                            tilePos, 
-                            tilePos + new System.Numerics.Vector2(displayTileSize, displayTileSize), 
-                            ImGui.GetColorU32(new System.Numerics.Vector4(0.3f, 0.8f, 1.0f, 1.0f)),
-                            0f,
-                            ImDrawFlags.None,
-                            3f
-                        );
-                    }
-                    else
-                    {
-                        drawList.AddRect(
-                            tilePos, 
-                            tilePos + new System.Numerics.Vector2(displayTileSize, displayTileSize), 
-                            ImGui.GetColorU32(new System.Numerics.Vector4(0.3f, 0.3f, 0.3f, 0.5f))
-                        );
-                    }
-                }
-            }
-            
-            if (ImGui.IsWindowHovered())
-            {
-                HandlePaletteInput(canvasPos, mousePos, displayTileSize);
-            }
-            
-            ImGui.Dummy(new System.Numerics.Vector2(_tilesPerRow * displayTileSize, _tilesPerColumn * displayTileSize));
-            
-            ImGui.EndChild();
-        }
-
-        private void HandlePaletteInput(System.Numerics.Vector2 canvasPos, System.Numerics.Vector2 mousePos, int displayTileSize)
-        {
-            int tileX = (int)((mousePos.X - canvasPos.X) / displayTileSize);
-            int tileY = (int)((mousePos.Y - canvasPos.Y) / displayTileSize);
-            
-            if (tileX < 0 || tileX >= _tilesPerRow || tileY < 0 || tileY >= _tilesPerColumn)
-                return;
-            
-            if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-            {
-                if (!ImGui.GetIO().KeyShift)
-                {
-                    _selectedTiles.Clear();
-                }
-                _selectionStart = new System.Numerics.Vector2(tileX, tileY);
-                _isSelecting = true;
-            }
-            
-            if (ImGui.IsMouseDragging(ImGuiMouseButton.Left) && _isSelecting)
-            {
-                if (!ImGui.GetIO().KeyShift)
-                {
-                    _selectedTiles.Clear();
-                }
-                
-                int minX = (int)Math.Min(_selectionStart.X, tileX);
-                int maxX = (int)Math.Max(_selectionStart.X, tileX);
-                int minY = (int)Math.Min(_selectionStart.Y, tileY);
-                int maxY = (int)Math.Max(_selectionStart.Y, tileY);
-                
-                for (int y = minY; y <= maxY; y++)
-                {
-                    for (int x = minX; x <= maxX; x++)
-                    {
-                        var tile = new System.Numerics.Vector2(x, y);
-                        if (!_selectedTiles.Contains(tile))
-                        {
-                            _selectedTiles.Add(tile);
-                        }
-                    }
-                }
-            }
-            
-            if (ImGui.IsMouseReleased(ImGuiMouseButton.Left))
-            {
-                _isSelecting = false;
-            }
-        }
-
-        private void RenderTilemapView()
-        {
-            ImGui.BeginChild("TilemapView", new System.Numerics.Vector2(0, 0), ImGuiChildFlags.Border, ImGuiWindowFlags.HorizontalScrollbar);
-            
-            var drawList = ImGui.GetWindowDrawList();
-            var canvasPos = ImGui.GetCursorScreenPos();
-            var mousePos = ImGui.GetMousePos();
-            
-            int displayTileSize = (int)(_tileSize * _zoom);
-            
-            for (int y = 0; y < _gridHeight; y++)
-            {
-                for (int x = 0; x < _gridWidth; x++)
-                {
-                    System.Numerics.Vector2 tilePos = new System.Numerics.Vector2(
-                        canvasPos.X + x * displayTileSize + _viewportScroll.X,
-                        canvasPos.Y + y * displayTileSize + _viewportScroll.Y
-                    );
-                    
-                    System.Numerics.Vector2 tileSize = new System.Numerics.Vector2(displayTileSize, displayTileSize);
-                    
-                    drawList.AddRect(tilePos, tilePos + tileSize, ImGui.GetColorU32(new System.Numerics.Vector4(0.2f, 0.2f, 0.2f, 0.5f)));
-                    
-                    int tileId = _worldData[y][x];
-                    
-                    if (tileId > 0 && _tilesetTexture != null)
-                    {
-                        int tileIndex = tileId - 1;
-                        int tx = tileIndex % _tilesPerRow;
-                        int ty = tileIndex / _tilesPerRow;
-                        
-                        System.Numerics.Vector2 uv0 = new System.Numerics.Vector2(
-                            (float)(tx * _tileSize) / _tilesetTexture.Width,
-                            (float)(ty * _tileSize) / _tilesetTexture.Height
-                        );
-                        
-                        System.Numerics.Vector2 uv1 = new System.Numerics.Vector2(
-                            (float)((tx + 1) * _tileSize) / _tilesetTexture.Width,
-                            (float)((ty + 1) * _tileSize) / _tilesetTexture.Height
-                        );
-                        
-                        drawList.AddImage(_tilesetTexturePtr, tilePos, tilePos + tileSize, uv0, uv1);
-                    }
-                    
-                    if (_collisionData[y][x])
-                    {
-                        drawList.AddRectFilled(tilePos, tilePos + tileSize, 
-                            ImGui.GetColorU32(new System.Numerics.Vector4(1.0f, 0.0f, 0.0f, 0.3f)));
-                    }
-                }
-            }
-            
-            if (ImGui.IsWindowHovered())
-            {
-                HandleMapInput(canvasPos, mousePos, displayTileSize);
-            }
-            
-            ImGui.Dummy(new System.Numerics.Vector2(_gridWidth * displayTileSize, _gridHeight * displayTileSize));
-            
-            ImGui.EndChild();
-        }
-
-        private void HandleMapInput(System.Numerics.Vector2 canvasPos, System.Numerics.Vector2 mousePos, int displayTileSize)
-        {
-            if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) || ImGui.IsMouseClicked(ImGuiMouseButton.Right))
-            {
-                int gridX = (int)((mousePos.X - canvasPos.X - _viewportScroll.X) / displayTileSize);
-                int gridY = (int)((mousePos.Y - canvasPos.Y - _viewportScroll.Y) / displayTileSize);
-                
-                if (gridX >= 0 && gridX < _gridWidth && gridY >= 0 && gridY < _gridHeight)
-                {
-                    if (_collisionMode)
-                    {
-                        bool newValue = ImGui.IsMouseClicked(ImGuiMouseButton.Left);
-                        bool oldValue = _collisionData[gridY][gridX];
-                        
-                        if (newValue != oldValue)
-                        {
-                            _undoStack.Push(new EditorAction
-                            {
-                                X = gridX,
-                                Y = gridY,
-                                OldTileId = _worldData[gridY][gridX],
-                                NewTileId = _worldData[gridY][gridX],
-                                OldCollision = oldValue,
-                                NewCollision = newValue
-                            });
-                            
-                            _collisionData[gridY][gridX] = newValue;
-                            _redoStack.Clear();
-                        }
-                    }
-                    else
-                    {
-                        bool isRightClick = ImGui.IsMouseClicked(ImGuiMouseButton.Right);
-                        PlaceTiles(gridX, gridY, isRightClick);
-                    }
-                }
-            }
-            
-            if (ImGui.IsMouseDragging(ImGuiMouseButton.Left) || ImGui.IsMouseDragging(ImGuiMouseButton.Right))
-            {
-                int gridX = (int)((mousePos.X - canvasPos.X - _viewportScroll.X) / displayTileSize);
-                int gridY = (int)((mousePos.Y - canvasPos.Y - _viewportScroll.Y) / displayTileSize);
-                
-                if (gridX >= 0 && gridX < _gridWidth && gridY >= 0 && gridY < _gridHeight)
-                {
-                    if (_collisionMode)
-                    {
-                        bool newValue = ImGui.IsMouseDragging(ImGuiMouseButton.Left);
-                        _collisionData[gridY][gridX] = newValue;
-                    }
-                    else
-                    {
-                        bool isRightClick = ImGui.IsMouseDragging(ImGuiMouseButton.Right);
-                        PlaceTiles(gridX, gridY, isRightClick);
-                    }
-                }
-            }
-            
-            if (ImGui.IsMouseDragging(ImGuiMouseButton.Middle))
-            {
-                var delta = ImGui.GetMouseDragDelta(ImGuiMouseButton.Middle);
-                _viewportScroll.X += delta.X;
-                _viewportScroll.Y += delta.Y;
-                ImGui.ResetMouseDragDelta(ImGuiMouseButton.Middle);
-            }
-            
-            float wheel = ImGui.GetIO().MouseWheel;
-            if (wheel != 0)
-            {
-                _zoom += wheel * 0.1f;
-                _zoom = Math.Clamp(_zoom, 0.5f, 4.0f);
-            }
-        }
-
-        private void PlaceTiles(int startX, int startY, bool erase)
+        internal void PlaceTiles(int startX, int startY, bool erase)
         {
             if (_selectedTiles.Count == 0 && !erase)
                 return;
@@ -719,7 +264,7 @@ namespace Snow.Editor
                         int paletteX = minTileX + dx;
                         int paletteY = minTileY + dy;
                         
-                        var paletteTile = new System.Numerics.Vector2(paletteX, paletteY);
+                        var paletteTile = new Vector2(paletteX, paletteY);
                         
                         if (_selectedTiles.Contains(paletteTile))
                         {
@@ -736,7 +281,7 @@ namespace Snow.Editor
             }
         }
 
-        private void Undo()
+        internal void Undo()
         {
             if (_undoStack.Count == 0) return;
             
@@ -748,7 +293,7 @@ namespace Snow.Editor
             _redoStack.Push(action);
         }
 
-        private void Redo()
+        internal void Redo()
         {
             if (_redoStack.Count == 0) return;
             
@@ -760,7 +305,7 @@ namespace Snow.Editor
             _undoStack.Push(action);
         }
 
-        private void ClearMap()
+        internal void ClearMap()
         {
             for (int y = 0; y < _gridHeight; y++)
             {
@@ -775,67 +320,36 @@ namespace Snow.Editor
             _redoStack.Clear();
         }
 
-        private string ShowOpenFileDialog(string extension)
-        {
-            OpenFileName ofn = new OpenFileName();
-            ofn.structSize = Marshal.SizeOf(ofn);
-            
-            string filter = extension.ToLower() == "png" ? "PNG Files\0*.png\0All Files\0*.*\0\0" : 
-                           extension.ToLower() == "json" ? "JSON Files\0*.json\0All Files\0*.*\0\0" : 
-                           "All Files\0*.*\0\0";
-            
-            ofn.filter = filter;
-            ofn.file = new string(new char[256]);
-            ofn.maxFile = ofn.file.Length;
-            ofn.fileTitle = new string(new char[64]);
-            ofn.maxFileTitle = ofn.fileTitle.Length;
-            ofn.initialDir = Directory.GetCurrentDirectory();
-            ofn.title = "Open File";
-            ofn.defExt = extension;
-            ofn.flags = 0x00080000 | 0x00001000 | 0x00000800 | 0x00000008;
-
-            if (GetOpenFileName(ofn))
-            {
-                return ofn.file;
-            }
-            
-            return null;
-        }
-
-        private string ShowSaveFileDialog(string extension)
-        {
-            OpenFileName ofn = new OpenFileName();
-            ofn.structSize = Marshal.SizeOf(ofn);
-            
-            string filter = extension.ToLower() == "json" ? "JSON Files\0*.json\0All Files\0*.*\0\0" : 
-                           "All Files\0*.*\0\0";
-            
-            ofn.filter = filter;
-            ofn.file = new string(new char[256]);
-            ofn.maxFile = ofn.file.Length;
-            ofn.fileTitle = new string(new char[64]);
-            ofn.maxFileTitle = ofn.fileTitle.Length;
-            ofn.initialDir = Directory.GetCurrentDirectory();
-            ofn.title = "Save File";
-            ofn.defExt = extension;
-            ofn.flags = 0x00000002 | 0x00000004;
-
-            if (GetSaveFileName(ofn))
-            {
-                return ofn.file;
-            }
-            
-            return null;
-        }
-
-        private void SetStatusMessage(string message, bool isError)
+        internal void SetStatusMessage(string message, bool isError)
         {
             _statusMessage = message;
             _statusMessageTimer = 3.0f;
             _statusMessageIsError = isError;
         }
 
-        private class EditorAction
+        internal int GridWidth => _gridWidth;
+        internal int GridHeight => _gridHeight;
+        internal int TileSize => _tileSize;
+        internal int[][] WorldData => _worldData;
+        internal bool[][] CollisionData => _collisionData;
+        internal Texture2D TilesetTexture => _tilesetTexture;
+        internal int TilesPerRow => _tilesPerRow;
+        internal int TilesPerColumn => _tilesPerColumn;
+        internal List<Vector2> SelectedTiles => _selectedTiles;
+        internal Vector2 SelectionStart { get => _selectionStart; set => _selectionStart = value; }
+        internal bool IsSelecting { get => _isSelecting; set => _isSelecting = value; }
+        internal bool CollisionMode { get => _collisionMode; set => _collisionMode = value; }
+        internal Vector2 ViewportScroll { get => _viewportScroll; set => _viewportScroll = value; }
+        internal float Zoom { get => _zoom; set => _zoom = value; }
+        internal float PaletteZoom { get => _paletteZoom; set => _paletteZoom = value; }
+        internal Stack<EditorAction> UndoStack => _undoStack;
+        internal Stack<EditorAction> RedoStack => _redoStack;
+        internal string StatusMessage => _statusMessage;
+        internal float StatusMessageTimer => _statusMessageTimer;
+        internal bool StatusMessageIsError => _statusMessageIsError;
+        internal IntPtr TilesetTexturePtr => _tilesetTexturePtr;
+
+        internal class EditorAction
         {
             public int X { get; set; }
             public int Y { get; set; }
