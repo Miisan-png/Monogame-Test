@@ -1,3 +1,4 @@
+// Snow/Editor/EditorMain.cs
 using ImGuiNET;
 using Snow.Engine;
 using System;
@@ -23,6 +24,7 @@ namespace Snow.Editor
             _gameRenderer = gameRenderer;
             _viewport = new EditorViewport(gameRenderer);
             _tilemapEditor = new TilemapEditor(gameRenderer, graphicsDevice, imGuiRenderer);
+            _tilemapEditor.SetMapChangedCallback(OnTilemapEditorMapChanged);
             _actorEditor = new ActorEditor(graphicsDevice, imGuiRenderer);
             _actorEditor.SetSceneChangedCallback(OnActorEditorSceneChanged);
             _fileWatcher = new MultiFileWatcher();
@@ -31,6 +33,12 @@ namespace Snow.Editor
         private void OnActorEditorSceneChanged(string scenePath)
         {
             System.Console.WriteLine($"[Editor] Actor editor saved scene, reloading game: {scenePath}");
+            _gameRenderer.ReloadLevel();
+        }
+
+        private void OnTilemapEditorMapChanged(string mapPath)
+        {
+            System.Console.WriteLine($"[Editor] Tilemap editor saved map, reloading game: {mapPath}");
             _gameRenderer.ReloadLevel();
         }
 

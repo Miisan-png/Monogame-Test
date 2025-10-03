@@ -1,3 +1,4 @@
+// Snow/Editor/TilemapEditor.cs
 using ImGuiNET;
 using Microsoft.Xna.Framework.Graphics;
 using System;
@@ -45,6 +46,12 @@ namespace Snow.Editor
         private MonoGame.ImGuiNet.ImGuiRenderer _imGuiRenderer;
         
         private TilemapEditorUI _ui;
+        
+        private string _currentMapPath = "";
+        private bool _hasUnsavedChanges = false;
+        private float _autoSaveTimer = 0f;
+        private const float AUTO_SAVE_DELAY = 1.0f;
+        private Action<string> _onMapChanged;
 
         public TilemapEditor(GameRenderer gameRenderer, GraphicsDevice graphicsDevice, MonoGame.ImGuiNet.ImGuiRenderer imGuiRenderer)
         {
@@ -55,6 +62,11 @@ namespace Snow.Editor
             InitializeGridData();
             
             _ui = new TilemapEditorUI(this);
+        }
+
+        public void SetMapChangedCallback(Action<string> callback)
+        {
+            _onMapChanged = callback;
         }
 
         private void InitializeGridData()
@@ -120,6 +132,9 @@ namespace Snow.Editor
                 _tilesPerRow = _tilesetTexture.Width / _tileSize;
                 _tilesPerColumn = _tilesetTexture.Height / _tileSize;
             }
+            
+            _hasUnsavedChanges = true;
+            _autoSaveTimer = AUTO_SAVE_DELAY;
         }
 
         public void SaveMap(string path)
@@ -139,7 +154,13 @@ namespace Snow.Editor
                 string json = JsonSerializer.Serialize(mapData, options);
                 File.WriteAllText(path, json);
                 
+                _currentMapPath = path;
+                _hasUnsavedChanges = false;
+                _autoSaveTimer = 0f;
+                
                 SetStatusMessage($"Map saved: {Path.GetFileName(path)}", false);
+                
+                _onMapChanged?.Invoke(path);
             }
             catch (Exception ex)
             {
@@ -194,6 +215,10 @@ namespace Snow.Editor
                     _tilesPerColumn = _tilesetTexture.Height / _tileSize;
                 }
                 
+                _currentMapPath = path;
+                _hasUnsavedChanges = false;
+                _autoSaveTimer = 0f;
+                
                 SetStatusMessage($"Map loaded: {Path.GetFileName(path)}", false);
             }
             catch (Exception ex)
@@ -207,6 +232,15 @@ namespace Snow.Editor
             if (_statusMessageTimer > 0)
             {
                 _statusMessageTimer -= 1f / 60f;
+            }
+            
+            if (_hasUnsavedChanges && _autoSaveTimer > 0)
+            {
+                _autoSaveTimer -= 1f / 60f;
+                if (_autoSaveTimer <= 0 && !string.IsNullOrEmpty(_currentMapPath))
+                {
+                    SaveMap(_currentMapPath);
+                }
             }
             
             _ui.Render();
@@ -232,6 +266,7 @@ namespace Snow.Editor
                         NewCollision = _collisionData[startY][startX]
                     });
                     _worldData[startY][startX] = 0;
+                    MarkAsChanged();
                 }
                 return;
             }
@@ -274,11 +309,30 @@ namespace Snow.Editor
                             if (tileId != oldTileId)
                             {
                                 _worldData[mapY][mapX] = tileId;
+                                MarkAsChanged();
                             }
                         }
                     }
                 }
             }
+        }
+
+        internal void SetCollisionTile(int x, int y, bool value)
+        {
+            if (x >= 0 && x < _gridWidth && y >= 0 && y < _gridHeight)
+            {
+                if (_collisionData[y][x] != value)
+                {
+                    _collisionData[y][x] = value;
+                    MarkAsChanged();
+                }
+            }
+        }
+
+        private void MarkAsChanged()
+        {
+            _hasUnsavedChanges = true;
+            _autoSaveTimer = AUTO_SAVE_DELAY;
         }
 
         internal void Undo()
@@ -291,6 +345,7 @@ namespace Snow.Editor
             _collisionData[action.Y][action.X] = action.OldCollision;
             
             _redoStack.Push(action);
+            MarkAsChanged();
         }
 
         internal void Redo()
@@ -303,6 +358,7 @@ namespace Snow.Editor
             _collisionData[action.Y][action.X] = action.NewCollision;
             
             _undoStack.Push(action);
+            MarkAsChanged();
         }
 
         internal void ClearMap()
@@ -318,6 +374,7 @@ namespace Snow.Editor
             
             _undoStack.Clear();
             _redoStack.Clear();
+            MarkAsChanged();
         }
 
         internal void SetStatusMessage(string message, bool isError)
@@ -348,6 +405,8 @@ namespace Snow.Editor
         internal float StatusMessageTimer => _statusMessageTimer;
         internal bool StatusMessageIsError => _statusMessageIsError;
         internal IntPtr TilesetTexturePtr => _tilesetTexturePtr;
+        internal bool HasUnsavedChanges => _hasUnsavedChanges;
+        internal float AutoSaveTimer => _autoSaveTimer;
 
         internal class EditorAction
         {

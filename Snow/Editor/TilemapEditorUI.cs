@@ -1,3 +1,4 @@
+// Snow/Editor/TilemapEditorUI.cs
 using ImGuiNET;
 using System;
 using System.IO;
@@ -138,7 +139,14 @@ namespace Snow.Editor
 
         private void RenderStatusMessage()
         {
-            if (_editor.StatusMessageTimer > 0)
+            if (_editor.HasUnsavedChanges)
+            {
+                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1, 1, 0, 1));
+                ImGui.Text($"Auto-saving in {_editor.AutoSaveTimer:F1}s...");
+                ImGui.PopStyleColor();
+                ImGui.Separator();
+            }
+            else if (_editor.StatusMessageTimer > 0)
             {
                 if (_editor.StatusMessageIsError)
                 {
@@ -441,23 +449,7 @@ namespace Snow.Editor
                     if (_editor.CollisionMode)
                     {
                         bool newValue = ImGui.IsMouseClicked(ImGuiMouseButton.Left);
-                        bool oldValue = _editor.CollisionData[gridY][gridX];
-                        
-                        if (newValue != oldValue)
-                        {
-                            _editor.UndoStack.Push(new TilemapEditor.EditorAction
-                            {
-                                X = gridX,
-                                Y = gridY,
-                                OldTileId = _editor.WorldData[gridY][gridX],
-                                NewTileId = _editor.WorldData[gridY][gridX],
-                                OldCollision = oldValue,
-                                NewCollision = newValue
-                            });
-                            
-                            _editor.CollisionData[gridY][gridX] = newValue;
-                            _editor.RedoStack.Clear();
-                        }
+                        _editor.SetCollisionTile(gridX, gridY, newValue);
                     }
                     else
                     {
@@ -477,7 +469,7 @@ namespace Snow.Editor
                     if (_editor.CollisionMode)
                     {
                         bool newValue = ImGui.IsMouseDragging(ImGuiMouseButton.Left);
-                        _editor.CollisionData[gridY][gridX] = newValue;
+                        _editor.SetCollisionTile(gridX, gridY, newValue);
                     }
                     else
                     {
