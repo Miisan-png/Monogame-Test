@@ -3,11 +3,11 @@ name = Forest Level 1 Enhanced
 tilemap = "levels/lvl.json"
 tileset = "assets/world_tileset.png"
 background_color = rgba(81, 73, 150, 1)
-properties = {music: "assets/audio/forest_ambient.ogg", gravity: 1400}
+properties = {properties: System.Collections.Generic.Dictionary`2[System.String,System.Object]}
 
 [entity id="playerspawn_1"]
 type = "PlayerSpawn"
 position = 143.3, 80.9
-collision_shape = {type: "box", offset_x: 5.8999996, offset_y: 2.3000002, width: 11.8, height: 20.800001, radius: 0}
+collision_shape = {type: "box", offset_x: 5.097059, offset_y: 1.817647, width: 44.800003, height: 47.2, radius: 0}
 sprite_data = {texture: "assets/Main/Player/Player1.png", origin_x: 0, origin_y: 0, scale_x: 1, scale_y: 1}
 

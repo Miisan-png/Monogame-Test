@@ -1,5 +1,6 @@
 using ImGuiNET;
 using Microsoft.Xna.Framework.Graphics;
+using Snow.Engine;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -10,7 +11,7 @@ namespace Snow.Editor
     public class ActorEditor
     {
         private string _currentScenePath;
-        private Snow.Engine.SceneData _currentScene;
+        private SceneData _currentScene;
         private int _selectedEntityIndex = -1;
         private bool _isOpen = true;
         private GraphicsDevice _graphicsDevice;
@@ -37,6 +38,11 @@ namespace Snow.Editor
         private float _animationSpeed = 0.1f;
         private bool _isPlayingAnimation = false;
         private List<string> _currentAnimationFrames = new List<string>();
+        
+        // Auto-save functionality
+        private bool _hasUnsavedChanges = false;
+        private float _autoSaveTimer = 0f;
+        private const float AUTO_SAVE_DELAY = 2.0f; // Save 2 seconds after last edit
 
         public bool IsOpen { get => _isOpen; set => _isOpen = value; }
 
@@ -46,38 +52,61 @@ namespace Snow.Editor
             _imGuiRenderer = imGuiRenderer;
         }
 
-        public void LoadScene(string path)
+        public void LoadSceneData(SceneData sceneData, string scenePath)
         {
             try
             {
-                _currentScenePath = path;
-                _currentScene = Snow.Engine.SceneParser.ParseScene(path);
+                _currentScenePath = scenePath;
+                _currentScene = sceneData;
                 _selectedEntityIndex = -1;
                 _previewPan = Vector2.Zero;
+                _hasUnsavedChanges = false;
+                _autoSaveTimer = 0f;
+                
+                System.Console.WriteLine($"[ActorEditor] Scene data loaded: {scenePath}");
             }
             catch (Exception ex)
             {
-                System.Console.WriteLine($"Failed to load scene: {ex.Message}");
+                System.Console.WriteLine($"[ActorEditor] Failed to load scene data: {ex.Message}");
             }
         }
 
-        public void SaveScene()
+        public void SaveSceneData()
         {
             if (_currentScene != null && !string.IsNullOrEmpty(_currentScenePath))
             {
                 try
                 {
-                    Snow.Engine.SceneSerializer.SaveScene(_currentScene, _currentScenePath);
+                    SceneSerializer.SaveScene(_currentScene, _currentScenePath);
+                    _hasUnsavedChanges = false;
+                    _autoSaveTimer = 0f;
+                    System.Console.WriteLine($"[ActorEditor] Scene saved: {_currentScenePath}");
                 }
                 catch (Exception ex)
                 {
-                    System.Console.WriteLine($"Failed to save scene: {ex.Message}");
+                    System.Console.WriteLine($"[ActorEditor] Failed to save scene: {ex.Message}");
                 }
             }
         }
 
+        private void MarkAsChanged()
+        {
+            _hasUnsavedChanges = true;
+            _autoSaveTimer = AUTO_SAVE_DELAY;
+        }
+
         public void Update(float deltaTime)
         {
+            // Auto-save logic
+            if (_hasUnsavedChanges && _autoSaveTimer > 0)
+            {
+                _autoSaveTimer -= deltaTime;
+                if (_autoSaveTimer <= 0)
+                {
+                    SaveSceneData();
+                }
+            }
+        
             if (_isPlayingAnimation && _currentAnimationFrames.Count > 0)
             {
                 _animationTimer += deltaTime;
@@ -97,25 +126,6 @@ namespace Snow.Editor
 
             if (ImGui.BeginMenuBar())
             {
-                if (ImGui.BeginMenu("File"))
-                {
-                    if (ImGui.MenuItem("Open Scene"))
-                    {
-                        string path = ShowOpenFileDialog("scene");
-                        if (!string.IsNullOrEmpty(path))
-                        {
-                            LoadScene(path);
-                        }
-                    }
-
-                    if (ImGui.MenuItem("Save Scene", null, false, _currentScene != null))
-                    {
-                        SaveScene();
-                    }
-
-                    ImGui.EndMenu();
-                }
-                
                 if (ImGui.BeginMenu("View"))
                 {
                     ImGui.MenuItem("Show Collision Gizmo", null, ref _showCollisionGizmo);
@@ -130,6 +140,16 @@ namespace Snow.Editor
                 ImGui.Text("No scene loaded. Open a scene from File menu.");
                 ImGui.End();
                 return;
+            }
+
+            // Show auto-save indicator
+            if (_hasUnsavedChanges)
+            {
+                ImGui.TextColored(new Vector4(1, 1, 0, 1), $"Auto-saving in {_autoSaveTimer:F1}s...");
+            }
+            else
+            {
+                ImGui.TextColored(new Vector4(0, 1, 0, 1), "All changes saved");
             }
 
             ImGui.Columns(3);
@@ -182,7 +202,7 @@ namespace Snow.Editor
             ImGui.EndChild();
         }
 
-        private void LoadEntityTextures(Snow.Engine.EntityData entity)
+        private void LoadEntityTextures(EntityData entity)
         {
             _currentAnimationFrames.Clear();
             _currentAnimationFrame = 0;
@@ -340,7 +360,7 @@ namespace Snow.Editor
             ImGui.EndChild();
         }
 
-        private string GetCurrentTexturePath(Snow.Engine.EntityData entity)
+        private string GetCurrentTexturePath(EntityData entity)
         {
             if (_currentAnimationFrames.Count > 0)
             {
@@ -355,7 +375,7 @@ namespace Snow.Editor
             return null;
         }
 
-        private void RenderCollisionGizmo(ImDrawListPtr drawList, Snow.Engine.EntityData entity, 
+        private void RenderCollisionGizmo(ImDrawListPtr drawList, EntityData entity, 
             Vector2 spriteTopLeft, Vector2 canvasPos, Vector2 canvasSize, Vector2 mousePos)
         {
             var shape = entity.CollisionShape;
@@ -410,12 +430,14 @@ namespace Snow.Editor
                     var delta = new Vector2(mousePos.X - _dragStartMouse.X, mousePos.Y - _dragStartMouse.Y);
                     shape.OffsetX = _dragStartOffset.X + delta.X / _previewZoom;
                     shape.OffsetY = _dragStartOffset.Y + delta.Y / _previewZoom;
+                    MarkAsChanged();
                 }
 
                 if (_isResizingCollision && ImGui.IsMouseDragging(ImGuiMouseButton.Left))
                 {
                     var delta = new Vector2(mousePos.X - _dragStartMouse.X, mousePos.Y - _dragStartMouse.Y);
                     ResizeCollisionBox(shape, delta);
+                    MarkAsChanged();
                 }
 
                 if (ImGui.IsMouseReleased(ImGuiMouseButton.Left))
@@ -490,7 +512,7 @@ namespace Snow.Editor
             return "";
         }
 
-        private void ResizeCollisionBox(Snow.Engine.CollisionShape shape, Vector2 delta)
+        private void ResizeCollisionBox(CollisionShape shape, Vector2 delta)
         {
             float deltaX = delta.X / _previewZoom;
             float deltaY = delta.Y / _previewZoom;
@@ -562,11 +584,13 @@ namespace Snow.Editor
                 if (ImGui.DragFloat("Position X", ref x, 1f))
                 {
                     entity.X = x;
+                    MarkAsChanged();
                 }
 
                 if (ImGui.DragFloat("Position Y", ref y, 1f))
                 {
                     entity.Y = y;
+                    MarkAsChanged();
                 }
             }
 
@@ -578,7 +602,8 @@ namespace Snow.Editor
                 {
                     if (ImGui.Button("Add Collision Shape"))
                     {
-                        entity.CollisionShape = new Snow.Engine.CollisionShape();
+                        entity.CollisionShape = new CollisionShape();
+                        MarkAsChanged();
                     }
                 }
                 else
@@ -589,6 +614,7 @@ namespace Snow.Editor
                     if (ImGui.Combo("Type", ref currentType, types, types.Length))
                     {
                         entity.CollisionShape.Type = types[currentType];
+                        MarkAsChanged();
                     }
 
                     float offsetX = entity.CollisionShape.OffsetX;
@@ -600,11 +626,13 @@ namespace Snow.Editor
                     if (ImGui.DragFloat("Offset X", ref offsetX, 0.1f))
                     {
                         entity.CollisionShape.OffsetX = offsetX;
+                        MarkAsChanged();
                     }
 
                     if (ImGui.DragFloat("Offset Y", ref offsetY, 0.1f))
                     {
                         entity.CollisionShape.OffsetY = offsetY;
+                        MarkAsChanged();
                     }
 
                     if (entity.CollisionShape.Type == "box")
@@ -612,11 +640,13 @@ namespace Snow.Editor
                         if (ImGui.DragFloat("Width", ref width, 0.1f, 1f, 200f))
                         {
                             entity.CollisionShape.Width = width;
+                            MarkAsChanged();
                         }
 
                         if (ImGui.DragFloat("Height", ref height, 0.1f, 1f, 200f))
                         {
                             entity.CollisionShape.Height = height;
+                            MarkAsChanged();
                         }
                     }
                     else
@@ -624,12 +654,14 @@ namespace Snow.Editor
                         if (ImGui.DragFloat("Radius", ref radius, 0.1f, 1f, 200f))
                         {
                             entity.CollisionShape.Radius = radius;
+                            MarkAsChanged();
                         }
                     }
 
                     if (ImGui.Button("Remove Collision Shape"))
                     {
                         entity.CollisionShape = null;
+                        MarkAsChanged();
                     }
                 }
             }
@@ -642,7 +674,8 @@ namespace Snow.Editor
                 {
                     if (ImGui.Button("Add Sprite Data"))
                     {
-                        entity.SpriteData = new Snow.Engine.SpriteData();
+                        entity.SpriteData = new SpriteData();
+                        MarkAsChanged();
                     }
                 }
                 else
@@ -651,6 +684,7 @@ namespace Snow.Editor
                     if (ImGui.InputText("Texture Path", ref texturePath, 256))
                     {
                         entity.SpriteData.TexturePath = texturePath;
+                        MarkAsChanged();
                     }
 
                     ImGui.SameLine();
@@ -661,6 +695,7 @@ namespace Snow.Editor
                         {
                             entity.SpriteData.TexturePath = path;
                             LoadTexture(path);
+                            MarkAsChanged();
                         }
                     }
 
@@ -672,26 +707,31 @@ namespace Snow.Editor
                     if (ImGui.DragFloat("Origin X", ref originX, 0.1f))
                     {
                         entity.SpriteData.OriginX = originX;
+                        MarkAsChanged();
                     }
 
                     if (ImGui.DragFloat("Origin Y", ref originY, 0.1f))
                     {
                         entity.SpriteData.OriginY = originY;
+                        MarkAsChanged();
                     }
 
                     if (ImGui.DragFloat("Scale X", ref scaleX, 0.01f, 0.1f, 10f))
                     {
                         entity.SpriteData.ScaleX = scaleX;
+                        MarkAsChanged();
                     }
 
                     if (ImGui.DragFloat("Scale Y", ref scaleY, 0.01f, 0.1f, 10f))
                     {
                         entity.SpriteData.ScaleY = scaleY;
+                        MarkAsChanged();
                     }
 
                     if (ImGui.Button("Remove Sprite Data"))
                     {
                         entity.SpriteData = null;
+                        MarkAsChanged();
                     }
                 }
             }
