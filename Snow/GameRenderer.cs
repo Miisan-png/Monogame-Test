@@ -27,8 +27,24 @@ namespace Snow
         private MainMenu _mainMenu;
 
         private Random _random;
-        private float _windTimer;
         private float _physicsParticleSpawnTimer;
+        
+        private class WindParticle
+        {
+            public Vector2 Position;
+            public Vector2 Velocity;
+            public float Size;
+            public float Depth;
+            public Color Color;
+            public bool Active;
+            public float Rotation;
+            public float RotationSpeed;
+        }
+        
+        private WindParticle[] _windParticles;
+        private const int MAX_WIND_PARTICLES = 30;
+        private float _windSpawnTimer;
+        private float _windSpawnRate;
 
         private GameHUD _gameHUD;
         private int _collectedShards;
@@ -86,6 +102,7 @@ namespace Snow
                 }
 
                 factoryContext.Tilemap = scene.Tilemap;
+                InitializeWindParticles();
             }
             catch (Exception ex)
             {
@@ -126,10 +143,23 @@ namespace Snow
             _particles = new ParticleSystem(_graphicsDevice, 5000);
             _transitionManager = new TransitionManager(_graphicsDevice);
             _random = new Random();
-            _windTimer = 0f;
             _physicsParticleSpawnTimer = 0f;
             _collectedShards = 0;
             _totalShards = 0;
+            
+            _windParticles = new WindParticle[MAX_WIND_PARTICLES];
+            for (int i = 0; i < MAX_WIND_PARTICLES; i++)
+            {
+                _windParticles[i] = new WindParticle
+                {
+                    Active = false,
+                    Velocity = Vector2.Zero,
+                    Rotation = 0f,
+                    RotationSpeed = 0f
+                };
+            }
+            _windSpawnTimer = 0f;
+            _windSpawnRate = 0.15f;
 
             _sceneManager = new SceneManager(_graphicsDevice, _graphicsManager);
 
@@ -145,6 +175,105 @@ namespace Snow
             _mainMenu = new MainMenu(_graphicsDevice, _camera, _particles, _transitionManager, StartGame);
 
             _debugUI.Enabled = false;
+        }
+
+        private void InitializeWindParticles()
+        {
+            for (int i = 0; i < MAX_WIND_PARTICLES; i++)
+            {
+                _windParticles[i].Active = false;
+            }
+        }
+
+        private void SpawnWindParticle()
+        {
+            for (int i = 0; i < MAX_WIND_PARTICLES; i++)
+            {
+                if (!_windParticles[i].Active)
+                {
+                    float depth = (float)_random.NextDouble();
+                    float depthScale = 0.3f + depth * 0.7f;
+                    
+                    _windParticles[i].Position = new Vector2(
+                        _camera.Position.X + _camera.ViewportWidth + 20,
+                        _camera.Position.Y + (float)_random.NextDouble() * _camera.ViewportHeight
+                    );
+                    
+                    float baseSpeed = -20f - (float)_random.NextDouble() * 30f;
+                    float verticalDrift = (float)(_random.NextDouble() * 15f - 2f);
+                    
+                    _windParticles[i].Velocity = new Vector2(baseSpeed, verticalDrift);
+                    _windParticles[i].Size = _random.Next(1, 4);
+                    _windParticles[i].Depth = depth;
+                    _windParticles[i].Rotation = (float)(_random.NextDouble() * Math.PI * 2);
+                    _windParticles[i].RotationSpeed = (float)(_random.NextDouble() * 2f - 1f);
+                    
+                    int alpha = (int)(40 + depth * 120);
+                    _windParticles[i].Color = new Color(190, 195, 215, alpha);
+                    _windParticles[i].Active = true;
+                    break;
+                }
+            }
+        }
+
+        private void UpdateWindParticles(float deltaTime)
+        {
+            _windSpawnTimer += deltaTime;
+            if (_windSpawnTimer >= _windSpawnRate)
+            {
+                SpawnWindParticle();
+                _windSpawnTimer = 0f;
+            }
+
+            for (int i = 0; i < MAX_WIND_PARTICLES; i++)
+            {
+                if (_windParticles[i].Active)
+                {
+                    float parallaxFactor = 0.4f + _windParticles[i].Depth * 0.6f;
+                    
+                    _windParticles[i].Position.X += _windParticles[i].Velocity.X * deltaTime * parallaxFactor;
+                    _windParticles[i].Position.Y += _windParticles[i].Velocity.Y * deltaTime * parallaxFactor;
+                    
+                    _windParticles[i].Rotation += _windParticles[i].RotationSpeed * deltaTime;
+                    
+                    if (_windParticles[i].Position.X < _camera.Position.X - 20 ||
+                        _windParticles[i].Position.Y > _camera.Position.Y + _camera.ViewportHeight + 20)
+                    {
+                        _windParticles[i].Active = false;
+                    }
+                }
+            }
+        }
+
+        private void DrawWindParticles(SpriteBatch spriteBatch)
+        {
+            spriteBatch.Begin(
+                samplerState: SamplerState.PointClamp,
+                transformMatrix: _camera.GetTransformMatrix()
+            );
+
+            for (int i = 0; i < MAX_WIND_PARTICLES; i++)
+            {
+                if (_windParticles[i].Active)
+                {
+                    int size = (int)_windParticles[i].Size;
+                    Vector2 origin = new Vector2(size / 2f, size / 2f);
+                    
+                    spriteBatch.Draw(
+                        _pixel,
+                        _windParticles[i].Position,
+                        null,
+                        _windParticles[i].Color,
+                        _windParticles[i].Rotation,
+                        origin,
+                        new Vector2(size, size),
+                        SpriteEffects.None,
+                        0f
+                    );
+                }
+            }
+
+            spriteBatch.End();
         }
 
         private void StartGame()
@@ -223,6 +352,7 @@ namespace Snow
                 _gameStarted = true;
                 _debugUI.Enabled = true;
                 SpawnInitialFireflies();
+                InitializeWindParticles();
             }
             catch (Exception ex)
             {
@@ -417,30 +547,7 @@ namespace Snow
                 CollisionSystem.ResolveCollision(_player, _sceneManager.CurrentScene.Tilemap, deltaTime);
             }
 
-            _windTimer += deltaTime;
-            if (_windTimer > 0.05f)
-            {
-                float cameraLeft = _camera.Position.X;
-                float cameraTop = _camera.Position.Y;
-
-                for (int i = 0; i < 3; i++)
-                {
-                    float spawnX = cameraLeft - 10;
-                    float spawnY = (float)(_random.NextDouble() * 180) + cameraTop;
-                    Vector2 windVel = new Vector2((float)(_random.NextDouble() * 60 + 40), (float)(_random.NextDouble() * 10 - 5));
-                    float life = (float)(_random.NextDouble() * 2.0 + 1.5);
-
-                    _particles.Emit(
-                        new Vector2(spawnX, spawnY),
-                        windVel,
-                        new Color(180, 180, 200, 100),
-                        life,
-                        1f
-                    );
-                }
-
-                _windTimer = 0f;
-            }
+            UpdateWindParticles(deltaTime);
 
             _camera.Follow(_player.Position);
             _camera.Update(deltaTime);
@@ -543,6 +650,8 @@ namespace Snow
                 _sceneManager.Draw(_graphicsManager.SpriteBatch, _camera, gameTime);
 
                 _graphicsManager.SpriteBatch.End();
+
+                DrawWindParticles(_graphicsManager.SpriteBatch);
 
                 _particles.DrawPhysicsParticlesGlow(_graphicsManager.SpriteBatch, _glowTexture, _camera.GetTransformMatrix());
                 _particles.DrawPhysicsParticles(_graphicsManager.SpriteBatch, _camera.GetTransformMatrix());
