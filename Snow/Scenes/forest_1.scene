@@ -4,13 +4,9 @@ tilemap = "levels/lvl.tilemap"
 tileset = "assets/world_tileset.png"
 background_color = rgba(0, 0, 0, 1)
 
-[entity id="playerspawn_1"]
+[entity id="9a454931-8b5c-4519-b293-8f999aaea33e"]
 type = "PlayerSpawn"
-position = 160, 90
-collision_shape = {type: "box", offset_x: 5.222222, offset_y: 2.0444446, width: 12.822222, height: 20.444445, radius: 0}
-sprite_data = {texture: "assets/Main/Player/Player1.png", origin_x: 0, origin_y: 0, scale_x: 1, scale_y: 1}
-
-[entity id="shard_1"]
-type = "Shard"
-position = 200, 90
+position = 49.633392, 81.00936
+collision_shape = {type: "box", offset_x: 5.8, offset_y: 1.6, width: 12, height: 20.555555, radius: 0}
+sprite_data = {texture: "C:\Users\Azar\Desktop\Monogame\Monogame-Test\Snow\assets\Main\Player\Player1.png", origin_x: 0, origin_y: 0, scale_x: 1, scale_y: 1}
 

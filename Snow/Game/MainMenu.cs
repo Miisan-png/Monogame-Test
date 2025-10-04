@@ -9,6 +9,7 @@ namespace Snow.Game
     {
         MainMenu,
         Settings,
+        IntroCutscene,
         InGame
     }
 
@@ -24,11 +25,14 @@ namespace Snow.Game
         private Action _onStartGame;
         private Random _random;
         private float _ambientParticleTimer;
+        private IntroCutscene _introCutscene;
+        private GraphicsDevice _graphicsDevice;
 
         public MenuState CurrentState => _currentState;
 
         public MainMenu(GraphicsDevice device, Camera camera, ParticleSystem particles, TransitionManager transitionManager, Action onStartGame)
         {
+            _graphicsDevice = device;
             _camera = camera;
             _particles = particles;
             _transitionManager = transitionManager;
@@ -49,7 +53,7 @@ namespace Snow.Game
             _buttonsVisible = true;
             _buttonAnimTimer = 0f;
 
-            Vector2 center = new Vector2(160, 90);
+            Vector2 center = new Vector2(640, 360);
             float spacing = 35f;
 
             _uiManager.AddButton("START", center + new Vector2(0, -spacing), OnStartGame);
@@ -60,7 +64,13 @@ namespace Snow.Game
         private void OnStartGame()
         {
             _buttonsVisible = false;
-            _transitionManager.StartTransition(TransitionType.CircleClose, 2.0f, new Vector2(160, 90), 0.0f, () =>
+            _currentState = MenuState.IntroCutscene;
+            _introCutscene = new IntroCutscene(_graphicsDevice, OnIntroCutsceneComplete);
+        }
+
+        private void OnIntroCutsceneComplete()
+        {
+            _transitionManager.StartTransition(TransitionType.Fade, 2.0f, new Vector2(160, 90), 0.0f, () =>
             {
                 _currentState = MenuState.InGame;
                 _onStartGame?.Invoke();
@@ -82,8 +92,8 @@ namespace Snow.Game
             _ambientParticleTimer += deltaTime;
             if (_ambientParticleTimer > 0.1f)
             {
-                float x = (float)_random.NextDouble() * 320f;
-                float y = (float)_random.NextDouble() * 180f;
+                float x = (float)_random.NextDouble() * 1280f;
+                float y = (float)_random.NextDouble() * 720f;
                 Vector2 pos = new Vector2(x, y);
                 Vector2 vel = new Vector2(
                     (float)(_random.NextDouble() - 0.5) * 15f,
@@ -100,9 +110,14 @@ namespace Snow.Game
                 _ambientParticleTimer = 0f;
             }
 
-            if (_buttonsVisible)
+            if (_buttonsVisible && _currentState == MenuState.MainMenu)
             {
                 _uiManager.Update(deltaTime);
+            }
+
+            if (_currentState == MenuState.IntroCutscene && _introCutscene != null)
+            {
+                _introCutscene.Update(deltaTime);
             }
 
             _buttonAnimTimer += deltaTime;
@@ -110,12 +125,16 @@ namespace Snow.Game
 
         public void Draw(SpriteBatch spriteBatch)
         {
-            if (_currentState != MenuState.MainMenu)
-                return;
-
-            if (_buttonsVisible)
+            if (_currentState == MenuState.MainMenu)
             {
-                _uiManager.Draw(spriteBatch);
+                if (_buttonsVisible)
+                {
+                    _uiManager.Draw(spriteBatch);
+                }
+            }
+            else if (_currentState == MenuState.IntroCutscene && _introCutscene != null)
+            {
+                _introCutscene.Draw(spriteBatch);
             }
         }
     }

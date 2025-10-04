@@ -217,8 +217,6 @@ namespace Snow.Engine
                     p.Velocity += acceleration * deltaTime;
                     p.Velocity *= p.Drag;
                     
-                    p.Velocity.Y += 15f * deltaTime;
-                    
                     Vector2 newPos = p.Position + p.Velocity * deltaTime;
                     
                     if (tilemap != null)

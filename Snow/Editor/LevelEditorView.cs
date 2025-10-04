@@ -129,7 +129,8 @@ namespace Snow.Editor
             ImGui.Text($"| Selected: {_tilemapOverlay.SelectedTiles.Count}");
 
             ImGui.SameLine();
-            ImGui.Text($"| Mode: {(_tilemapOverlay.CollisionMode ? "Collision" : "Draw")}");
+            string modeText = _tilemapOverlay.SpikeMode ? "Spike" : _tilemapOverlay.CollisionMode ? "Collision" : "Draw";
+            ImGui.Text($"| Mode: {modeText}");
 
             ImGui.Separator();
             
@@ -420,6 +421,12 @@ namespace Snow.Editor
                         drawList.AddRectFilled(tileScreenPos, tileScreenPos + tileSizeVec,
                             ImGui.GetColorU32(new Vector4(1.0f, 0.0f, 0.0f, 0.3f)));
                     }
+
+                    if (_tilemapOverlay.ShowSpikeOverlay && _tilemapOverlay.GetSpikeAt(x, y))
+                    {
+                        drawList.AddRectFilled(tileScreenPos, tileScreenPos + tileSizeVec,
+                            ImGui.GetColorU32(new Vector4(1.0f, 0.5f, 0.0f, 0.5f)));
+                    }
                 }
             }
 
@@ -469,7 +476,11 @@ namespace Snow.Editor
 
             if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) || ImGui.IsMouseDragging(ImGuiMouseButton.Left))
             {
-                if (_tilemapOverlay.CollisionMode)
+                if (_tilemapOverlay.SpikeMode)
+                {
+                    _tilemapOverlay.SetSpikeAt(gridX, gridY, true);
+                }
+                else if (_tilemapOverlay.CollisionMode)
                 {
                     _tilemapOverlay.SetCollisionAt(gridX, gridY, true);
                 }
@@ -481,7 +492,11 @@ namespace Snow.Editor
 
             if (ImGui.IsMouseClicked(ImGuiMouseButton.Right) || ImGui.IsMouseDragging(ImGuiMouseButton.Right))
             {
-                if (_tilemapOverlay.CollisionMode)
+                if (_tilemapOverlay.SpikeMode)
+                {
+                    _tilemapOverlay.SetSpikeAt(gridX, gridY, false);
+                }
+                else if (_tilemapOverlay.CollisionMode)
                 {
                     _tilemapOverlay.SetCollisionAt(gridX, gridY, false);
                 }

@@ -231,11 +231,11 @@ namespace Snow.Editor
             {
                 if (_spikeMode)
                 {
-                    SetSpikeTileInternal(gridX, gridY, true);
+                    SetSpikeAt(gridX, gridY, true);
                 }
                 else if (_collisionMode)
                 {
-                    SetCollisionTileInternal(gridX, gridY, true);
+                    SetCollisionAt(gridX, gridY, true);
                 }
                 else
                 {
@@ -247,11 +247,11 @@ namespace Snow.Editor
             {
                 if (_spikeMode)
                 {
-                    SetSpikeTileInternal(gridX, gridY, false);
+                    SetSpikeAt(gridX, gridY, false);
                 }
                 else if (_collisionMode)
                 {
-                    SetCollisionTileInternal(gridX, gridY, false);
+                    SetCollisionAt(gridX, gridY, false);
                 }
                 else
                 {
@@ -374,30 +374,6 @@ namespace Snow.Editor
                             }
                         }
                     }
-                }
-            }
-        }
-
-        private void SetCollisionTileInternal(int x, int y, bool value)
-        {
-            if (x >= 0 && x < _data.GridWidth && y >= 0 && y < _data.GridHeight)
-            {
-                if (_data.Collision[y][x] != value)
-                {
-                    _data.Collision[y][x] = value;
-                    MarkAsChanged();
-                }
-            }
-        }
-
-        private void SetSpikeTileInternal(int x, int y, bool value)
-        {
-            if (x >= 0 && x < _data.GridWidth && y >= 0 && y < _data.GridHeight)
-            {
-                if (_data.Spikes[y][x] != value)
-                {
-                    _data.Spikes[y][x] = value;
-                    MarkAsChanged();
                 }
             }
         }

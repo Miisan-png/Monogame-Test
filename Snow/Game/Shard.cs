@@ -1,4 +1,3 @@
-// Snow/Game/Shard.cs
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Snow.Engine;
@@ -156,7 +155,7 @@ namespace Snow.Game
                 {
                     IsFullyCollected = true;
                     SpawnCollectParticles();
-                    _camera.Shake(3f, 0.15f);
+                    _camera?.Shake(3f, 0.15f);
                 }
             }
         }
