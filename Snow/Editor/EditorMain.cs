@@ -193,6 +193,12 @@ namespace Snow.Editor
         {
             _actorEditor.Update(deltaTime);
             _tilemapOverlay.Update(deltaTime);
+            
+            // Update game renderer with canvas modulate color in real-time
+            if (_colorModulatePanel != null)
+            {
+                _gameRenderer.SetCanvasModulateColor(_colorModulatePanel.CurrentColor);
+            }
         }
 
         private void LoadSceneFile(string scenePath)

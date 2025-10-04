@@ -34,7 +34,7 @@ namespace Snow
         private int _collectedShards;
         private int _totalShards;
         private KeyboardState _previousKeyboard;
-        
+
         private Color _canvasModulate = new Color(0xc5, 0x00, 0xa8, 0xff);
 
         private bool _gameStarted = false;
@@ -74,7 +74,7 @@ namespace Snow
 
                 Vector2 currentPlayerPos = _player.Position;
                 _player = new Player(currentPlayerPos, _graphicsDevice, _input, _graphicsManager, _particles, _camera);
-                
+
                 if (playerSpawnData != null)
                 {
                     _player.ApplyCollisionShape(playerSpawnData.CollisionShape);
@@ -103,135 +103,135 @@ namespace Snow
         }
 
         private void Initialize()
-{
-    _console = new DebugConsole();
-    _console.Open();
-
-    _pixel = new Texture2D(_graphicsDevice, 1, 1);
-    _pixel.SetData(new[] { Color.White });
-
-    CreateGlowTexture();
-
-    _canvasUI = new CanvasUI(_graphicsDevice);
-    _debugUI = new DebugUI(_graphicsDevice);
-    _gameHUD = new GameHUD(_graphicsDevice);
-    _graphicsManager = new GraphicsManager(_graphicsDevice);
-    _input = new InputManager();
-    _postProcessing = new PostProcessing(_graphicsDevice, 320, 180);
-    _camera = new Camera(320, 180, 320, 180);
-    _particles = new ParticleSystem(_graphicsDevice, 5000);
-    _transitionManager = new TransitionManager(_graphicsDevice);
-    _random = new Random();
-    _windTimer = 0f;
-    _physicsParticleSpawnTimer = 0f;
-    _collectedShards = 0;
-    _totalShards = 0;
-
-    _sceneManager = new SceneManager(_graphicsDevice, _graphicsManager);
-
-    _console.Log("Snow Engine initialized");
-    _console.LogSuccess($"Bloom enabled: {_postProcessing.BloomEnabled}");
-    _console.Log("Controls:");
-    _console.Log("  Q/A - Bloom Threshold");
-    _console.Log("  W/S - Bloom Intensity");
-    _console.Log("  E/D - Canvas Modulate");
-    _console.Log("  R   - Reset to defaults");
-    _console.Log("  T   - Toggle Camera Mode");
-
-    _mainMenu = new MainMenu(_graphicsDevice, _camera, _particles, _transitionManager, StartGame);
-    
-    _debugUI.Enabled = false;
-}
-
-private void StartGame()
-{
-    try
-    {
-        var factoryContext = new EntityFactoryContext
         {
-            Input = _input,
-            Particles = _particles
-        };
-        _sceneManager.SetFactoryContext(factoryContext);
+            _console = new DebugConsole();
+            _console.Open();
 
-        var scene = _sceneManager.LoadScene(_currentScenePath);
-        _console.LogSuccess($"Scene loaded: {scene.Name}");
+            _pixel = new Texture2D(_graphicsDevice, 1, 1);
+            _pixel.SetData(new[] { Color.White });
 
-        if (scene.Tilemap != null)
-        {
-            _camera.SetBounds(scene.Tilemap.Width, scene.Tilemap.Height);
-            _console.Log($"Camera bounds set: {scene.Tilemap.Width}x{scene.Tilemap.Height}");
+            CreateGlowTexture();
+
+            _canvasUI = new CanvasUI(_graphicsDevice);
+            _debugUI = new DebugUI(_graphicsDevice);
+            _gameHUD = new GameHUD(_graphicsDevice);
+            _graphicsManager = new GraphicsManager(_graphicsDevice);
+            _input = new InputManager();
+            _postProcessing = new PostProcessing(_graphicsDevice, 320, 180);
+            _camera = new Camera(320, 180, 320, 180);
+            _particles = new ParticleSystem(_graphicsDevice, 5000);
+            _transitionManager = new TransitionManager(_graphicsDevice);
+            _random = new Random();
+            _windTimer = 0f;
+            _physicsParticleSpawnTimer = 0f;
+            _collectedShards = 0;
+            _totalShards = 0;
+
+            _sceneManager = new SceneManager(_graphicsDevice, _graphicsManager);
+
+            _console.Log("Snow Engine initialized");
+            _console.LogSuccess($"Bloom enabled: {_postProcessing.BloomEnabled}");
+            _console.Log("Controls:");
+            _console.Log("  Q/A - Bloom Threshold");
+            _console.Log("  W/S - Bloom Intensity");
+            _console.Log("  E/D - Canvas Modulate");
+            _console.Log("  R   - Reset to defaults");
+            _console.Log("  T   - Toggle Camera Mode");
+
+            _mainMenu = new MainMenu(_graphicsDevice, _camera, _particles, _transitionManager, StartGame);
+
+            _debugUI.Enabled = false;
         }
 
-        var sceneData = SceneParser.ParseScene(_currentScenePath);
-        
-        if (sceneData.CameraSettings != null)
+        private void StartGame()
         {
-            _camera.SetRoomSize(sceneData.CameraSettings.RoomWidth, sceneData.CameraSettings.RoomHeight);
-            
-            if (sceneData.CameraSettings.FollowMode == "follow")
+            try
             {
-                _camera.Mode = CameraMode.Follow;
-                _console.Log("Camera mode: Follow");
+                var factoryContext = new EntityFactoryContext
+                {
+                    Input = _input,
+                    Particles = _particles
+                };
+                _sceneManager.SetFactoryContext(factoryContext);
+
+                var scene = _sceneManager.LoadScene(_currentScenePath);
+                _console.LogSuccess($"Scene loaded: {scene.Name}");
+
+                if (scene.Tilemap != null)
+                {
+                    _camera.SetBounds(scene.Tilemap.Width, scene.Tilemap.Height);
+                    _console.Log($"Camera bounds set: {scene.Tilemap.Width}x{scene.Tilemap.Height}");
+                }
+
+                var sceneData = SceneParser.ParseScene(_currentScenePath);
+
+                if (sceneData.CameraSettings != null)
+                {
+                    _camera.SetRoomSize(sceneData.CameraSettings.RoomWidth, sceneData.CameraSettings.RoomHeight);
+
+                    if (sceneData.CameraSettings.FollowMode == "follow")
+                    {
+                        _camera.Mode = CameraMode.Follow;
+                        _console.Log("Camera mode: Follow");
+                    }
+                    else
+                    {
+                        _camera.Mode = CameraMode.Room;
+                        _console.Log($"Camera mode: Room ({sceneData.CameraSettings.RoomWidth}x{sceneData.CameraSettings.RoomHeight})");
+                    }
+                }
+                else
+                {
+                    _camera.SetRoomSize(320, 180);
+                    _camera.Mode = CameraMode.Room;
+                    _console.Log("Camera mode: Room (320x180) - Default");
+                }
+
+                EntityData playerSpawnData = null;
+                foreach (var entity in sceneData.Entities)
+                {
+                    if (entity.Id == "playerspawn_1" || entity.Type == "PlayerSpawn")
+                    {
+                        playerSpawnData = entity;
+                        break;
+                    }
+                }
+
+                _player = new Player(scene.PlayerSpawnPosition, _graphicsDevice, _input, _graphicsManager, _particles, _camera);
+
+                if (playerSpawnData != null)
+                {
+                    _player.ApplyCollisionShape(playerSpawnData.CollisionShape);
+                    _player.ApplySpriteData(playerSpawnData.SpriteData);
+                }
+
+                _console.Log($"Player spawned at ({scene.PlayerSpawnPosition.X}, {scene.PlayerSpawnPosition.Y})");
+
+                factoryContext.Tilemap = scene.Tilemap;
+
+                _camera.Follow(_player.Position);
+                _camera.Update(0f);
+
+                Vector2 playerCenter = new Vector2(160, 90);
+                _transitionManager.StartTransition(TransitionType.CircleReveal, 3.5f, playerCenter, 2f);
+
+                _gameStarted = true;
+                _debugUI.Enabled = true;
+                SpawnInitialFireflies();
             }
-            else
+            catch (Exception ex)
             {
-                _camera.Mode = CameraMode.Room;
-                _console.Log($"Camera mode: Room ({sceneData.CameraSettings.RoomWidth}x{sceneData.CameraSettings.RoomHeight})");
+                _console.LogError($"Failed to load scene: {ex.Message}");
+                _console.Log("Stack trace: " + ex.StackTrace);
             }
         }
-        else
-        {
-            _camera.SetRoomSize(320, 180);
-            _camera.Mode = CameraMode.Room;
-            _console.Log("Camera mode: Room (320x180) - Default");
-        }
-
-        EntityData playerSpawnData = null;
-        foreach (var entity in sceneData.Entities)
-        {
-            if (entity.Id == "playerspawn_1" || entity.Type == "PlayerSpawn")
-            {
-                playerSpawnData = entity;
-                break;
-            }
-        }
-
-        _player = new Player(scene.PlayerSpawnPosition, _graphicsDevice, _input, _graphicsManager, _particles, _camera);
-        
-        if (playerSpawnData != null)
-        {
-            _player.ApplyCollisionShape(playerSpawnData.CollisionShape);
-            _player.ApplySpriteData(playerSpawnData.SpriteData);
-        }
-
-        _console.Log($"Player spawned at ({scene.PlayerSpawnPosition.X}, {scene.PlayerSpawnPosition.Y})");
-
-        factoryContext.Tilemap = scene.Tilemap;
-
-        _camera.Follow(_player.Position);
-        _camera.Update(0f); 
-
-        Vector2 playerCenter = new Vector2(160, 90); 
-        _transitionManager.StartTransition(TransitionType.CircleReveal, 3.5f, playerCenter, 2f);
-
-        _gameStarted = true;
-        _debugUI.Enabled = true;
-        SpawnInitialFireflies();
-    }
-    catch (Exception ex)
-    {
-        _console.LogError($"Failed to load scene: {ex.Message}");
-        _console.Log("Stack trace: " + ex.StackTrace);
-    }
-}
 
         private void CreateGlowTexture()
         {
             int size = 32;
             _glowTexture = new Texture2D(_graphicsDevice, size, size);
             Color[] glowData = new Color[size * size];
-            
+
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
@@ -239,14 +239,14 @@ private void StartGame()
                     float dx = (x - size / 2f) / (size / 2f);
                     float dy = (y - size / 2f) / (size / 2f);
                     float distance = (float)Math.Sqrt(dx * dx + dy * dy);
-                    
+
                     float alpha = Math.Max(0, 1.0f - distance);
                     alpha = (float)Math.Pow(alpha, 1.5f);
-                    
+
                     glowData[y * size + x] = new Color(1f, 1f, 1f, alpha);
                 }
             }
-            
+
             _glowTexture.SetData(glowData);
         }
 
@@ -273,94 +273,94 @@ private void StartGame()
                     (float)(_random.NextDouble() - 0.5) * 12f,
                     (float)(_random.NextDouble() - 0.5) * 12f
                 );
-                
+
                 Color color = pastelColors[_random.Next(pastelColors.Length)];
-                
+
                 _particles.EmitPhysicsParticle(pos, vel, color, 0.6f, 0.2f);
             }
         }
 
-       public void Update(GameTime gameTime)
-{
-    if (_isPaused && _gameStarted) return;
-
-    _input.Update();
-    KeyboardState keyboard = Keyboard.GetState();
-
-    float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
-
-    _transitionManager.Update(deltaTime);
-
-    if (!_gameStarted || _mainMenu.CurrentState == MenuState.MainMenu)
-    {
-        _mainMenu.Update(deltaTime);
-        
-        Rectangle worldBounds = new Rectangle(0, 0, 320, 180);
-        _particles.Update(deltaTime, worldBounds, null);
-        
-        _camera.Update(deltaTime);
-    }
-
-    if (!_gameStarted)
-    {
-        _previousKeyboard = keyboard;
-        return;
-    }
-
-    HandleBloomControls(keyboard, gameTime);
-
-    _player.Update(gameTime);
-    
-    if (_sceneManager.CurrentScene != null)
-    {
-        Rectangle playerBounds = _player.GetCollisionBox();
-        
-        foreach (var entity in _sceneManager.CurrentScene.Entities)
+        public void Update(GameTime gameTime)
         {
-            entity.Update(gameTime);
-            
-            if (entity is Shard shard && !shard.IsFullyCollected)
+            if (_isPaused && _gameStarted) return;
+
+            _input.Update();
+            KeyboardState keyboard = Keyboard.GetState();
+
+            float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+            _transitionManager.Update(deltaTime);
+
+            if (!_gameStarted || _mainMenu.CurrentState == MenuState.MainMenu)
             {
-                if (shard.CheckCollision(playerBounds))
+                _mainMenu.Update(deltaTime);
+
+                Rectangle worldBounds = new Rectangle(0, 0, 320, 180);
+                _particles.Update(deltaTime, worldBounds, null);
+
+                _camera.Update(deltaTime);
+            }
+
+            if (!_gameStarted)
+            {
+                _previousKeyboard = keyboard;
+                return;
+            }
+
+            HandleBloomControls(keyboard, gameTime);
+
+            _player.Update(gameTime);
+
+            if (_sceneManager.CurrentScene != null)
+            {
+                Rectangle playerBounds = _player.GetCollisionBox();
+
+                foreach (var entity in _sceneManager.CurrentScene.Entities)
                 {
-                    shard.Collect(_player.Position + new Vector2(8, 12));
+                    entity.Update(gameTime);
+
+                    if (entity is Shard shard && !shard.IsFullyCollected)
+                    {
+                        if (shard.CheckCollision(playerBounds))
+                        {
+                            shard.Collect(_player.Position + new Vector2(8, 12));
+                        }
+
+                        if (shard.IsFullyCollected && shard.IsActive)
+                        {
+                            shard.IsActive = false;
+                            _collectedShards++;
+                        }
+                    }
                 }
-                
-                if (shard.IsFullyCollected && shard.IsActive)
+
+                _totalShards = 0;
+                foreach (var entity in _sceneManager.CurrentScene.Entities)
                 {
-                    shard.IsActive = false;
-                    _collectedShards++;
+                    if (entity is Shard)
+                        _totalShards++;
                 }
             }
-        }
-        
-        _totalShards = 0;
-        foreach (var entity in _sceneManager.CurrentScene.Entities)
-        {
-            if (entity is Shard)
-                _totalShards++;
-        }
-    }
-    
-    Tilemap tilemap = _sceneManager.CurrentScene?.Tilemap;
-    Rectangle worldBounds2 = new Rectangle(0, 0, 320, 180);
-    _particles.Update(deltaTime, worldBounds2, tilemap);
 
-    Vector2 playerCenter = _player.Position + new Vector2(8, 12);
-    float interactionRadius = 35f;
-    float interactionStrength = 300f;
-    _particles.ApplyRadialForce(playerCenter, interactionRadius, interactionStrength);
+            Tilemap tilemap = _sceneManager.CurrentScene?.Tilemap;
+            Rectangle worldBounds2 = new Rectangle(0, 0, 320, 180);
+            _particles.Update(deltaTime, worldBounds2, tilemap);
 
-    if (_player.GetPhysics().IsDashing)
-    {
-        _particles.ApplyRadialForce(playerCenter, 60f, 600f);
-    }
+            Vector2 playerCenter = _player.Position + new Vector2(8, 12);
+            float interactionRadius = 35f;
+            float interactionStrength = 300f;
+            _particles.ApplyRadialForce(playerCenter, interactionRadius, interactionStrength);
 
-    _physicsParticleSpawnTimer += deltaTime;
-    if (_physicsParticleSpawnTimer > 6f && _particles.GetPhysicsParticleCount() < 20)
-    {
-        Color[] pastelColors = new Color[]
-        {
+            if (_player.GetPhysics().IsDashing)
+            {
+                _particles.ApplyRadialForce(playerCenter, 60f, 600f);
+            }
+
+            _physicsParticleSpawnTimer += deltaTime;
+            if (_physicsParticleSpawnTimer > 6f && _particles.GetPhysicsParticleCount() < 20)
+            {
+                Color[] pastelColors = new Color[]
+                {
             new Color(255, 100, 150),
             new Color(100, 150, 255),
             new Color(150, 255, 100),
@@ -369,117 +369,117 @@ private void StartGame()
             new Color(100, 255, 200),
             new Color(255, 150, 100),
             new Color(150, 100, 255)
-        };
+                };
 
-        float x = (float)_random.NextDouble() * 320f;
-        float y = (float)_random.NextDouble() < 0.5f ? -10f : 190f;
-        Vector2 pos = new Vector2(x, y);
-        Vector2 vel = new Vector2(
-            (float)(_random.NextDouble() - 0.5) * 10f,
-            y < 0 ? (float)_random.NextDouble() * 12f + 4f : -(float)_random.NextDouble() * 12f - 4f
-        );
-        
-        Color color = pastelColors[_random.Next(pastelColors.Length)];
-        
-        _particles.EmitPhysicsParticle(pos, vel, color, 0.6f, 0.2f);
-        _physicsParticleSpawnTimer = 0f;
-    }
-    
-    if (_sceneManager.CurrentScene != null)
-    {
-        CollisionSystem.ResolveCollision(_player, _sceneManager.CurrentScene.Tilemap, deltaTime);
-    }
+                float x = (float)_random.NextDouble() * 320f;
+                float y = (float)_random.NextDouble() < 0.5f ? -10f : 190f;
+                Vector2 pos = new Vector2(x, y);
+                Vector2 vel = new Vector2(
+                    (float)(_random.NextDouble() - 0.5) * 10f,
+                    y < 0 ? (float)_random.NextDouble() * 12f + 4f : -(float)_random.NextDouble() * 12f - 4f
+                );
 
-    _windTimer += deltaTime;
-    if (_windTimer > 0.05f)
-    {
-        float cameraLeft = _camera.Position.X;
-        float cameraTop = _camera.Position.Y;
+                Color color = pastelColors[_random.Next(pastelColors.Length)];
 
-        for (int i = 0; i < 3; i++)
-        {
-            float spawnX = cameraLeft - 10;
-            float spawnY = (float)(_random.NextDouble() * 180) + cameraTop;
-            Vector2 windVel = new Vector2((float)(_random.NextDouble() * 60 + 40), (float)(_random.NextDouble() * 10 - 5));
-            float life = (float)(_random.NextDouble() * 2.0 + 1.5);
-            
-            _particles.Emit(
-                new Vector2(spawnX, spawnY),
-                windVel,
-                new Color(180, 180, 200, 100),
-                life,
-                1f
-            );
+                _particles.EmitPhysicsParticle(pos, vel, color, 0.6f, 0.2f);
+                _physicsParticleSpawnTimer = 0f;
+            }
+
+            if (_sceneManager.CurrentScene != null)
+            {
+                CollisionSystem.ResolveCollision(_player, _sceneManager.CurrentScene.Tilemap, deltaTime);
+            }
+
+            _windTimer += deltaTime;
+            if (_windTimer > 0.05f)
+            {
+                float cameraLeft = _camera.Position.X;
+                float cameraTop = _camera.Position.Y;
+
+                for (int i = 0; i < 3; i++)
+                {
+                    float spawnX = cameraLeft - 10;
+                    float spawnY = (float)(_random.NextDouble() * 180) + cameraTop;
+                    Vector2 windVel = new Vector2((float)(_random.NextDouble() * 60 + 40), (float)(_random.NextDouble() * 10 - 5));
+                    float life = (float)(_random.NextDouble() * 2.0 + 1.5);
+
+                    _particles.Emit(
+                        new Vector2(spawnX, spawnY),
+                        windVel,
+                        new Color(180, 180, 200, 100),
+                        life,
+                        1f
+                    );
+                }
+
+                _windTimer = 0f;
+            }
+
+            _camera.Follow(_player.Position);
+            _camera.Update(deltaTime);
+            _debugUI.Update(gameTime);
+            _canvasUI.Update(gameTime);
+            _gameHUD.Update(deltaTime);
+
+            _previousKeyboard = keyboard;
         }
-        
-        _windTimer = 0f;
-    }
-
-    _camera.Follow(_player.Position);
-    _camera.Update(deltaTime);
-    _debugUI.Update(gameTime);
-    _canvasUI.Update(gameTime);
-    _gameHUD.Update(deltaTime);
-
-    _previousKeyboard = keyboard;
-}
 
         private void HandleBloomControls(KeyboardState keyboard, GameTime gameTime)
-{
-    float adjustSpeed = (float)gameTime.ElapsedGameTime.TotalSeconds * 0.5f;
+        {
+            float adjustSpeed = (float)gameTime.ElapsedGameTime.TotalSeconds * 0.5f;
 
-    if (keyboard.IsKeyDown(Keys.Q))
-    {
-        _postProcessing.BloomThreshold += adjustSpeed;
-        _console.Log($"Bloom Threshold: {_postProcessing.BloomThreshold:F2}");
-    }
-    if (keyboard.IsKeyDown(Keys.A))
-    {
-        _postProcessing.BloomThreshold -= adjustSpeed;
-        _postProcessing.BloomThreshold = Math.Max(0f, _postProcessing.BloomThreshold);
-        _console.Log($"Bloom Threshold: {_postProcessing.BloomThreshold:F2}");
-    }
+            if (keyboard.IsKeyDown(Keys.Q))
+            {
+                _postProcessing.BloomThreshold += adjustSpeed;
+                _console.Log($"Bloom Threshold: {_postProcessing.BloomThreshold:F2}");
+            }
+            if (keyboard.IsKeyDown(Keys.A))
+            {
+                _postProcessing.BloomThreshold -= adjustSpeed;
+                _postProcessing.BloomThreshold = Math.Max(0f, _postProcessing.BloomThreshold);
+                _console.Log($"Bloom Threshold: {_postProcessing.BloomThreshold:F2}");
+            }
 
-    if (keyboard.IsKeyDown(Keys.W))
-    {
-        _postProcessing.BloomIntensity += adjustSpeed * 2f;
-        _console.Log($"Bloom Intensity: {_postProcessing.BloomIntensity:F2}");
-    }
-    if (keyboard.IsKeyDown(Keys.S))
-    {
-        _postProcessing.BloomIntensity -= adjustSpeed * 2f;
-        _postProcessing.BloomIntensity = Math.Max(0f, _postProcessing.BloomIntensity);
-        _console.Log($"Bloom Intensity: {_postProcessing.BloomIntensity:F2}");
-    }
+            if (keyboard.IsKeyDown(Keys.W))
+            {
+                _postProcessing.BloomIntensity += adjustSpeed * 2f;
+                _console.Log($"Bloom Intensity: {_postProcessing.BloomIntensity:F2}");
+            }
+            if (keyboard.IsKeyDown(Keys.S))
+            {
+                _postProcessing.BloomIntensity -= adjustSpeed * 2f;
+                _postProcessing.BloomIntensity = Math.Max(0f, _postProcessing.BloomIntensity);
+                _console.Log($"Bloom Intensity: {_postProcessing.BloomIntensity:F2}");
+            }
 
-    if (keyboard.IsKeyDown(Keys.E))
-    {
-        float r = _canvasModulate.R / 255f + adjustSpeed;
-        float g = _canvasModulate.G / 255f + adjustSpeed;
-        float b = _canvasModulate.B / 255f + adjustSpeed;
-        _canvasModulate = new Color(
-            Math.Min(1f, r),
-            Math.Min(1f, g),
-            Math.Min(1f, b)
-        );
-        _console.Log($"Canvas Modulate: R={_canvasModulate.R}, G={_canvasModulate.G}, B={_canvasModulate.B}");
-    }
-    if (keyboard.IsKeyDown(Keys.D))
-    {
-        float r = _canvasModulate.R / 255f - adjustSpeed;
-        float g = _canvasModulate.G / 255f - adjustSpeed;
-        float b = _canvasModulate.B / 255f - adjustSpeed;
-        _canvasModulate = new Color(
-            Math.Max(0f, r),
-            Math.Max(0f, g),
-            Math.Max(0f, b)
-        );
-        _console.Log($"Canvas Modulate: R={_canvasModulate.R}, G={_canvasModulate.G}, B={_canvasModulate.B}");
-    }
+            if (keyboard.IsKeyDown(Keys.E))
+            {
+                float r = _canvasModulate.R / 255f + adjustSpeed;
+                float g = _canvasModulate.G / 255f + adjustSpeed;
+                float b = _canvasModulate.B / 255f + adjustSpeed;
+                _canvasModulate = new Color(
+                    Math.Min(1f, r),
+                    Math.Min(1f, g),
+                    Math.Min(1f, b)
+                );
+                _console.Log($"Canvas Modulate: R={_canvasModulate.R}, G={_canvasModulate.G}, B={_canvasModulate.B}");
+            }
+            if (keyboard.IsKeyDown(Keys.D))
+            {
+                float r = _canvasModulate.R / 255f - adjustSpeed;
+                float g = _canvasModulate.G / 255f - adjustSpeed;
+                float b = _canvasModulate.B / 255f - adjustSpeed;
+                _canvasModulate = new Color(
+                    Math.Max(0f, r),
+                    Math.Max(0f, g),
+                    Math.Max(0f, b)
+                );
+                _console.Log($"Canvas Modulate: R={_canvasModulate.R}, G={_canvasModulate.G}, B={_canvasModulate.B}");
+            }
 
-    
-    // Temp Camera mode toggle 
-    if (keyboard.IsKeyDown(Keys.T) && !_previousKeyboard.IsKeyDown(Keys.T))
+
+            // Temp Camera mode toggle 
+            if (keyboard.IsKeyDown(Keys.T) && !_previousKeyboard.IsKeyDown(Keys.T))
             {
                 if (_camera.Mode == CameraMode.Room)
                 {
@@ -493,14 +493,14 @@ private void StartGame()
                 }
             }
 
-    if (keyboard.IsKeyDown(Keys.R) && !_previousKeyboard.IsKeyDown(Keys.R))
-    {
-        _postProcessing.BloomThreshold = 0.5f;
-        _postProcessing.BloomIntensity = 0.7f;
-        _canvasModulate = new Color(0xc5, 0x00, 0xa8, 0xff);
-        _console.LogSuccess("Reset to defaults!");
-    }
-}
+            if (keyboard.IsKeyDown(Keys.R) && !_previousKeyboard.IsKeyDown(Keys.R))
+            {
+                _postProcessing.BloomThreshold = 0.5f;
+                _postProcessing.BloomIntensity = 0.7f;
+                _canvasModulate = new Color(0xc5, 0x00, 0xa8, 0xff);
+                _console.LogSuccess("Reset to defaults!");
+            }
+        }
         public void Draw(GameTime gameTime)
         {
             _postProcessing.BeginGameRender();
@@ -549,41 +549,41 @@ private void StartGame()
 
 
 
-            
+
 
             var gameTexture = GetPostProcessingTexture("_gameRenderTarget");
             var bloomTexture = GetPostProcessingTexture("_bloomBlurVTarget");
-            
+
             _graphicsManager.SpriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp);
-_graphicsManager.SpriteBatch.Draw(gameTexture, destRect, _canvasModulate);
-_graphicsManager.SpriteBatch.End();
+            _graphicsManager.SpriteBatch.Draw(gameTexture, destRect, _canvasModulate);
+            _graphicsManager.SpriteBatch.End();
 
 
             if (_postProcessing.BloomEnabled && bloomTexture != null)
-{
-    _graphicsManager.SpriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Additive, SamplerState.PointClamp);
-    _graphicsManager.SpriteBatch.Draw(bloomTexture, destRect, Color.White);
-    _graphicsManager.SpriteBatch.End();
-}
+            {
+                _graphicsManager.SpriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Additive, SamplerState.PointClamp);
+                _graphicsManager.SpriteBatch.Draw(bloomTexture, destRect, Color.White);
+                _graphicsManager.SpriteBatch.End();
+            }
 
             _transitionManager.Draw();
 
 
             if (!_gameStarted || _mainMenu.CurrentState == MenuState.MainMenu)
-{
-    _mainMenu.Draw(_graphicsManager.SpriteBatch);
-}
+            {
+                _mainMenu.Draw(_graphicsManager.SpriteBatch);
+            }
 
-if (_gameStarted)
-{
-    _gameHUD.Draw(_graphicsManager.SpriteBatch, _player, _collectedShards, _totalShards);
-    
-    int entityCount = _sceneManager.CurrentScene?.Entities.Count ?? 0;
-    _debugUI.Draw(_graphicsManager.SpriteBatch, _player, _camera, entityCount);
-    _debugUI.DrawCollisionBoxes(_graphicsManager.SpriteBatch, _player, _camera, _pixel);
-}
+            if (_gameStarted)
+            {
+                _gameHUD.Draw(_graphicsManager.SpriteBatch, _player, _collectedShards, _totalShards);
 
-                        
+                int entityCount = _sceneManager.CurrentScene?.Entities.Count ?? 0;
+                _debugUI.Draw(_graphicsManager.SpriteBatch, _player, _camera, entityCount);
+                _debugUI.DrawCollisionBoxes(_graphicsManager.SpriteBatch, _player, _camera, _pixel);
+            }
+
+
             _canvasUI.Draw(_graphicsManager.SpriteBatch);
 
             _graphicsDevice.SetRenderTarget(null);
@@ -600,5 +600,12 @@ if (_gameStarted)
             _glowTexture?.Dispose();
             _console?.Dispose();
         }
+
+        public void SetCanvasModulateColor(Microsoft.Xna.Framework.Color color)
+{
+    _canvasModulate = color;
+}
     }
+    
+    
 }
