@@ -18,6 +18,10 @@ namespace Snow.Engine
         private float _shakeIntensity;
         private float _shakeDuration;
         private Random _random = new Random();
+        
+        // Add bounds
+        private Rectangle _bounds;
+        private bool _hasBounds = false;
 
         public int ViewportWidth => _viewportWidth;
         public int ViewportHeight => _viewportHeight;
@@ -34,6 +38,12 @@ namespace Snow.Engine
             _shakeOffset = Vector2.Zero;
         }
 
+        public void SetBounds(int width, int height)
+        {
+            _bounds = new Rectangle(0, 0, width, height);
+            _hasBounds = true;
+        }
+
         public void Shake(float intensity, float duration)
         {
             _shakeIntensity = intensity;
@@ -42,10 +52,18 @@ namespace Snow.Engine
 
         public void Follow(Vector2 targetPosition)
         {
-            Position = new Vector2(
-                targetPosition.X - _virtualWidth / 2,
-                targetPosition.Y - _virtualHeight / 2
-            );
+            // Center camera on target
+            float targetX = targetPosition.X - _virtualWidth / 2;
+            float targetY = targetPosition.Y - _virtualHeight / 2;
+            
+            // Clamp to bounds if set
+            if (_hasBounds)
+            {
+                targetX = MathHelper.Clamp(targetX, _bounds.Left, Math.Max(_bounds.Left, _bounds.Right - _virtualWidth));
+                targetY = MathHelper.Clamp(targetY, _bounds.Top, Math.Max(_bounds.Top, _bounds.Bottom - _virtualHeight));
+            }
+            
+            Position = new Vector2(targetX, targetY);
         }
 
         public void Update(float deltaTime)
@@ -71,8 +89,7 @@ namespace Snow.Engine
             
             return Matrix.CreateTranslation(new Vector3(-effectivePosition.X, -effectivePosition.Y, 0)) *
                    Matrix.CreateRotationZ(Rotation) *
-                   Matrix.CreateScale(Zoom) *
-                   Matrix.CreateTranslation(new Vector3(_viewportWidth / 2, _viewportHeight / 2, 0));
+                   Matrix.CreateScale(Zoom);
         }
 
         public Vector2 ScreenToWorld(Vector2 screenPosition)

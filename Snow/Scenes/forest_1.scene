@@ -2,7 +2,7 @@
 name = Forest Level 1 Enhanced
 tilemap = levels/lvl.tilemap
 tileset = assets/world_tileset.png
-background_color = rgba(81, 73, 150, 1)
+background_color = rgba(0, 0, 0, 1)
 
 [entity id="playerspawn_1"]
 type = PlayerSpawn

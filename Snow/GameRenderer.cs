@@ -136,55 +136,63 @@ namespace Snow
         }
 
         private void StartGame()
+{
+    try
+    {
+        var factoryContext = new EntityFactoryContext
         {
-            try
+            Input = _input,
+            Particles = _particles
+        };
+        _sceneManager.SetFactoryContext(factoryContext);
+
+        var scene = _sceneManager.LoadScene(_currentScenePath);
+        _console.LogSuccess($"Scene loaded: {scene.Name}");
+
+        if (scene.Tilemap != null)
+        {
+            _camera.SetBounds(scene.Tilemap.Width, scene.Tilemap.Height);
+            _console.Log($"Camera bounds set: {scene.Tilemap.Width}x{scene.Tilemap.Height}");
+        }
+
+        var sceneData = SceneParser.ParseScene(_currentScenePath);
+        EntityData playerSpawnData = null;
+        foreach (var entity in sceneData.Entities)
+        {
+            if (entity.Id == "playerspawn_1" || entity.Type == "PlayerSpawn")
             {
-                var factoryContext = new EntityFactoryContext
-                {
-                    Input = _input,
-                    Particles = _particles
-                };
-                _sceneManager.SetFactoryContext(factoryContext);
-
-                var scene = _sceneManager.LoadScene(_currentScenePath);
-                _console.LogSuccess($"Scene loaded: {scene.Name}");
-
-                var sceneData = SceneParser.ParseScene(_currentScenePath);
-                EntityData playerSpawnData = null;
-                foreach (var entity in sceneData.Entities)
-                {
-                    if (entity.Id == "playerspawn_1" || entity.Type == "PlayerSpawn")
-                    {
-                        playerSpawnData = entity;
-                        break;
-                    }
-                }
-
-                _player = new Player(scene.PlayerSpawnPosition, _graphicsDevice, _input, _graphicsManager, _particles, _camera);
-                
-                if (playerSpawnData != null)
-                {
-                    _player.ApplyCollisionShape(playerSpawnData.CollisionShape);
-                    _player.ApplySpriteData(playerSpawnData.SpriteData);
-                }
-
-                _console.Log($"Player spawned at ({scene.PlayerSpawnPosition.X}, {scene.PlayerSpawnPosition.Y})");
-
-                factoryContext.Tilemap = scene.Tilemap;
-
-                Vector2 playerCenter = new Vector2(143, 120);
-                _transitionManager.StartTransition(TransitionType.CircleReveal, 3.5f, playerCenter, 2f);
-
-                _gameStarted = true;
-                _debugUI.Enabled = true;
-                SpawnInitialFireflies();
-            }
-            catch (Exception ex)
-            {
-                _console.LogError($"Failed to load scene: {ex.Message}");
-                _console.Log("Stack trace: " + ex.StackTrace);
+                playerSpawnData = entity;
+                break;
             }
         }
+
+        _player = new Player(scene.PlayerSpawnPosition, _graphicsDevice, _input, _graphicsManager, _particles, _camera);
+        
+        if (playerSpawnData != null)
+        {
+            _player.ApplyCollisionShape(playerSpawnData.CollisionShape);
+            _player.ApplySpriteData(playerSpawnData.SpriteData);
+        }
+
+        _console.Log($"Player spawned at ({scene.PlayerSpawnPosition.X}, {scene.PlayerSpawnPosition.Y})");
+
+        factoryContext.Tilemap = scene.Tilemap;
+
+        _camera.Follow(_player.Position);
+
+        Vector2 playerCenter = new Vector2(143, 120);
+        _transitionManager.StartTransition(TransitionType.CircleReveal, 3.5f, playerCenter, 2f);
+
+        _gameStarted = true;
+        _debugUI.Enabled = true;
+        SpawnInitialFireflies();
+    }
+    catch (Exception ex)
+    {
+        _console.LogError($"Failed to load scene: {ex.Message}");
+        _console.Log("Stack trace: " + ex.StackTrace);
+    }
+}
 
         private void CreateGlowTexture()
         {
