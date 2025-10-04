@@ -19,6 +19,7 @@ namespace Snow.Game
         ShowHouse,
         SlideUpHouse,
         ShowFinalText,
+        SlideCamera,
         Complete
     }
 
@@ -38,6 +39,8 @@ namespace Snow.Game
         private Tween _finalTextAlphaTween;
         private float _finalTextAlpha;
         private BitmapFont _font;
+        private Vector2 _cameraOffset;
+        private Vector2Tween _cameraOffsetTween;
 
         private List<string> _dialogues = new List<string>
         {
@@ -52,6 +55,7 @@ namespace Snow.Game
         private int _currentDialogueIndex = 0;
 
         public bool IsComplete => _currentState == IntroState.Complete;
+        public Vector2 CameraOffset => _cameraOffset;
 
         public IntroCutscene(GraphicsDevice device, Action onComplete)
         {
@@ -63,10 +67,11 @@ namespace Snow.Game
             _stateTimer = 0f;
             _houseAlpha = 0f;
             _finalTextAlpha = 0f;
+            _cameraOffset = new Vector2(0, -720);
             
             LoadHouseIcon();
             
-            _housePosition = new Vector2(640, 480);
+            _housePosition = new Vector2(640, -240);
             
             StartDialogue(0);
         }
@@ -185,8 +190,8 @@ namespace Snow.Game
                         
                         if (_houseAlphaTween.IsComplete)
                         {
-                            Vector2 startPos = new Vector2(640, 480);
-                            Vector2 endPos = new Vector2(640, 280);
+                            Vector2 startPos = new Vector2(640, -240);
+                            Vector2 endPos = new Vector2(640, -440);
                             _housePositionTween = new Vector2Tween(startPos, endPos, 2.0f, EaseType.EaseOutQuad);
                             _finalTextAlphaTween = new Tween(0f, 1f, 2.0f, EaseType.Linear);
                             _currentState = IntroState.SlideUpHouse;
@@ -216,10 +221,25 @@ namespace Snow.Game
                     break;
 
                 case IntroState.ShowFinalText:
-                    if (_stateTimer > 3.0f)
+                    if (_stateTimer > 2.5f)
                     {
-                        _currentState = IntroState.Complete;
-                        _onComplete?.Invoke();
+                        _cameraOffsetTween = new Vector2Tween(new Vector2(0, -720), Vector2.Zero, 3.0f, EaseType.EaseInOutCubic);
+                        _currentState = IntroState.SlideCamera;
+                        _stateTimer = 0f;
+                    }
+                    break;
+
+                case IntroState.SlideCamera:
+                    if (_cameraOffsetTween != null)
+                    {
+                        _cameraOffsetTween.Update(deltaTime);
+                        _cameraOffset = _cameraOffsetTween.GetValue();
+                        
+                        if (_cameraOffsetTween.IsComplete)
+                        {
+                            _currentState = IntroState.Complete;
+                            _onComplete?.Invoke();
+                        }
                     }
                     break;
 
@@ -236,20 +256,21 @@ namespace Snow.Game
 
             if (_currentState >= IntroState.Dialogue1 && _currentState <= IntroState.FadeInHouse)
             {
-                Vector2 dialoguePos = new Vector2(640, 360);
+                Vector2 dialoguePos = new Vector2(640, -360) - _cameraOffset;
                 _dialogueRenderer.Draw(spriteBatch, dialoguePos, 2.0f);
             }
 
-            if (_currentState >= IntroState.ShowHouse && _currentState < IntroState.Complete)
+            if (_currentState >= IntroState.ShowHouse)
             {
+                Vector2 houseDrawPos = _housePosition - _cameraOffset;
                 Vector2 houseOrigin = new Vector2(_houseIcon.Width / 2f, _houseIcon.Height / 2f);
                 Color houseColor = Color.White * _houseAlpha;
-                spriteBatch.Draw(_houseIcon, _housePosition, null, houseColor, 0f, houseOrigin, 4.0f, SpriteEffects.None, 0f);
+                spriteBatch.Draw(_houseIcon, houseDrawPos, null, houseColor, 0f, houseOrigin, 4.0f, SpriteEffects.None, 0f);
             }
 
-            if (_currentState >= IntroState.SlideUpHouse && _currentState < IntroState.Complete)
+            if (_currentState >= IntroState.SlideUpHouse)
             {
-                Vector2 finalTextPos = new Vector2(640, 560);
+                Vector2 finalTextPos = new Vector2(640, -160) - _cameraOffset;
                 Color textColor = Color.White * _finalTextAlpha;
                 _font.DrawString(spriteBatch, "find your way home..", finalTextPos, textColor, 2.5f, TextAlignment.Center);
             }

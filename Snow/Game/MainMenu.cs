@@ -27,16 +27,18 @@ namespace Snow.Game
         private float _ambientParticleTimer;
         private IntroCutscene _introCutscene;
         private GraphicsDevice _graphicsDevice;
+        private Func<Player> _getPlayer;
 
         public MenuState CurrentState => _currentState;
 
-        public MainMenu(GraphicsDevice device, Camera camera, ParticleSystem particles, TransitionManager transitionManager, Action onStartGame)
+        public MainMenu(GraphicsDevice device, Camera camera, ParticleSystem particles, TransitionManager transitionManager, Action onStartGame, Func<Player> getPlayer)
         {
             _graphicsDevice = device;
             _camera = camera;
             _particles = particles;
             _transitionManager = transitionManager;
             _onStartGame = onStartGame;
+            _getPlayer = getPlayer;
             _uiManager = new UIManager(device, camera, particles);
             _currentState = MenuState.MainMenu;
             _buttonAnimTimer = 0f;
@@ -66,15 +68,18 @@ namespace Snow.Game
             _buttonsVisible = false;
             _currentState = MenuState.IntroCutscene;
             _introCutscene = new IntroCutscene(_graphicsDevice, OnIntroCutsceneComplete);
+            _onStartGame?.Invoke();
         }
 
         private void OnIntroCutsceneComplete()
         {
-            _transitionManager.StartTransition(TransitionType.Fade, 2.0f, new Vector2(160, 90), 0.0f, () =>
+            _currentState = MenuState.InGame;
+            
+            var player = _getPlayer?.Invoke();
+            if (player != null)
             {
-                _currentState = MenuState.InGame;
-                _onStartGame?.Invoke();
-            });
+                player.Unfreeze();
+            }
         }
 
         private void OnSettings()
@@ -136,6 +141,15 @@ namespace Snow.Game
             {
                 _introCutscene.Draw(spriteBatch);
             }
+        }
+
+        public Vector2 GetIntroCameraOffset()
+        {
+            if (_introCutscene != null)
+            {
+                return _introCutscene.CameraOffset;
+            }
+            return Vector2.Zero;
         }
     }
 }

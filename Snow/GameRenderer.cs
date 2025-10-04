@@ -172,7 +172,7 @@ namespace Snow
             _console.Log("  R   - Reset to defaults");
             _console.Log("  T   - Toggle Camera Mode");
 
-            _mainMenu = new MainMenu(_graphicsDevice, _camera, _particles, _transitionManager, StartGame);
+            _mainMenu = new MainMenu(_graphicsDevice, _camera, _particles, _transitionManager, StartGame, () => _player);
 
             _debugUI.Enabled = false;
         }
@@ -278,6 +278,8 @@ namespace Snow
 
         private void StartGame()
         {
+            if (_gameStarted) return;
+            
             try
             {
                 var factoryContext = new EntityFactoryContext
@@ -332,6 +334,7 @@ namespace Snow
 
                 _player = new Player(scene.PlayerSpawnPosition, _graphicsDevice, _input, _graphicsManager, _particles, _camera);
                 _player.SetRespawnPosition(scene.PlayerSpawnPosition);
+                _player.Freeze(999f);
 
                 if (playerSpawnData != null)
                 {
@@ -345,9 +348,6 @@ namespace Snow
 
                 _camera.Follow(_player.Position);
                 _camera.Update(0f);
-
-                Vector2 playerCenter = new Vector2(160, 90);
-                _transitionManager.StartTransition(TransitionType.CircleReveal, 3.5f, playerCenter, 2f);
 
                 _gameStarted = true;
                 _debugUI.Enabled = true;
@@ -426,7 +426,7 @@ namespace Snow
 
             _transitionManager.Update(deltaTime);
 
-            if (!_gameStarted || _mainMenu.CurrentState == MenuState.MainMenu)
+            if (!_gameStarted || _mainMenu.CurrentState == MenuState.MainMenu || _mainMenu.CurrentState == MenuState.IntroCutscene)
             {
                 _mainMenu.Update(deltaTime);
 
@@ -640,11 +640,13 @@ namespace Snow
 
             _graphicsDevice.Clear(new Color(24, 22, 43));
 
+            Vector2 cameraOffset = _mainMenu.GetIntroCameraOffset();
+
             if (_gameStarted)
             {
                 _graphicsManager.SpriteBatch.Begin(
                     samplerState: SamplerState.PointClamp,
-                    transformMatrix: _camera.GetTransformMatrix()
+                    transformMatrix: Matrix.CreateTranslation(-cameraOffset.X, -cameraOffset.Y, 0) * _camera.GetTransformMatrix()
                 );
 
                 _sceneManager.Draw(_graphicsManager.SpriteBatch, _camera, gameTime);
@@ -653,13 +655,13 @@ namespace Snow
 
                 DrawWindParticles(_graphicsManager.SpriteBatch);
 
-                _particles.DrawPhysicsParticlesGlow(_graphicsManager.SpriteBatch, _glowTexture, _camera.GetTransformMatrix());
-                _particles.DrawPhysicsParticles(_graphicsManager.SpriteBatch, _camera.GetTransformMatrix());
-                _particles.Draw(_graphicsManager.SpriteBatch, _camera.GetTransformMatrix());
+                _particles.DrawPhysicsParticlesGlow(_graphicsManager.SpriteBatch, _glowTexture, Matrix.CreateTranslation(-cameraOffset.X, -cameraOffset.Y, 0) * _camera.GetTransformMatrix());
+                _particles.DrawPhysicsParticles(_graphicsManager.SpriteBatch, Matrix.CreateTranslation(-cameraOffset.X, -cameraOffset.Y, 0) * _camera.GetTransformMatrix());
+                _particles.Draw(_graphicsManager.SpriteBatch, Matrix.CreateTranslation(-cameraOffset.X, -cameraOffset.Y, 0) * _camera.GetTransformMatrix());
 
                 _graphicsManager.SpriteBatch.Begin(
                     samplerState: SamplerState.PointClamp,
-                    transformMatrix: _camera.GetTransformMatrix()
+                    transformMatrix: Matrix.CreateTranslation(-cameraOffset.X, -cameraOffset.Y, 0) * _camera.GetTransformMatrix()
                 );
 
                 _sceneManager.DrawEntities(_graphicsManager.SpriteBatch, gameTime);
@@ -696,12 +698,12 @@ namespace Snow
 
             _transitionManager.Draw();
 
-            if (!_gameStarted || _mainMenu.CurrentState == MenuState.MainMenu)
+            if (!_gameStarted || _mainMenu.CurrentState == MenuState.MainMenu || _mainMenu.CurrentState == MenuState.IntroCutscene)
             {
                 _mainMenu.Draw(_graphicsManager.SpriteBatch);
             }
 
-            if (_gameStarted)
+            if (_gameStarted && _mainMenu.CurrentState == MenuState.InGame)
             {
                 _gameHUD.Draw(_graphicsManager.SpriteBatch, _player, _collectedShards, _totalShards);
 
