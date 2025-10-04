@@ -135,7 +135,7 @@ namespace Snow
             _debugUI.Enabled = false;
         }
 
-        private void StartGame()
+private void StartGame()
 {
     try
     {
@@ -156,6 +156,29 @@ namespace Snow
         }
 
         var sceneData = SceneParser.ParseScene(_currentScenePath);
+        
+        if (sceneData.CameraSettings != null)
+        {
+            _camera.SetRoomSize(sceneData.CameraSettings.RoomWidth, sceneData.CameraSettings.RoomHeight);
+            
+            if (sceneData.CameraSettings.FollowMode == "follow")
+            {
+                _camera.Mode = CameraMode.Follow;
+                _console.Log("Camera mode: Follow");
+            }
+            else
+            {
+                _camera.Mode = CameraMode.Room;
+                _console.Log($"Camera mode: Room ({sceneData.CameraSettings.RoomWidth}x{sceneData.CameraSettings.RoomHeight})");
+            }
+        }
+        else
+        {
+            _camera.SetRoomSize(320, 180);
+            _camera.Mode = CameraMode.Room;
+            _console.Log("Camera mode: Room (320x180) - Default");
+        }
+
         EntityData playerSpawnData = null;
         foreach (var entity in sceneData.Entities)
         {
@@ -179,8 +202,9 @@ namespace Snow
         factoryContext.Tilemap = scene.Tilemap;
 
         _camera.Follow(_player.Position);
+        _camera.Update(0f); 
 
-        Vector2 playerCenter = new Vector2(143, 120);
+        Vector2 playerCenter = new Vector2(160, 90); 
         _transitionManager.StartTransition(TransitionType.CircleReveal, 3.5f, playerCenter, 2f);
 
         _gameStarted = true;
@@ -362,67 +386,82 @@ namespace Snow
         }
 
         private void HandleBloomControls(KeyboardState keyboard, GameTime gameTime)
-        {
-            float adjustSpeed = (float)gameTime.ElapsedGameTime.TotalSeconds * 0.5f;
+{
+    float adjustSpeed = (float)gameTime.ElapsedGameTime.TotalSeconds * 0.5f;
 
-            if (keyboard.IsKeyDown(Keys.Q))
+    if (keyboard.IsKeyDown(Keys.Q))
+    {
+        _postProcessing.BloomThreshold += adjustSpeed;
+        _console.Log($"Bloom Threshold: {_postProcessing.BloomThreshold:F2}");
+    }
+    if (keyboard.IsKeyDown(Keys.A))
+    {
+        _postProcessing.BloomThreshold -= adjustSpeed;
+        _postProcessing.BloomThreshold = Math.Max(0f, _postProcessing.BloomThreshold);
+        _console.Log($"Bloom Threshold: {_postProcessing.BloomThreshold:F2}");
+    }
+
+    if (keyboard.IsKeyDown(Keys.W))
+    {
+        _postProcessing.BloomIntensity += adjustSpeed * 2f;
+        _console.Log($"Bloom Intensity: {_postProcessing.BloomIntensity:F2}");
+    }
+    if (keyboard.IsKeyDown(Keys.S))
+    {
+        _postProcessing.BloomIntensity -= adjustSpeed * 2f;
+        _postProcessing.BloomIntensity = Math.Max(0f, _postProcessing.BloomIntensity);
+        _console.Log($"Bloom Intensity: {_postProcessing.BloomIntensity:F2}");
+    }
+
+    if (keyboard.IsKeyDown(Keys.E))
+    {
+        float r = _canvasModulate.R / 255f + adjustSpeed;
+        float g = _canvasModulate.G / 255f + adjustSpeed;
+        float b = _canvasModulate.B / 255f + adjustSpeed;
+        _canvasModulate = new Color(
+            Math.Min(1f, r),
+            Math.Min(1f, g),
+            Math.Min(1f, b)
+        );
+        _console.Log($"Canvas Modulate: R={_canvasModulate.R}, G={_canvasModulate.G}, B={_canvasModulate.B}");
+    }
+    if (keyboard.IsKeyDown(Keys.D))
+    {
+        float r = _canvasModulate.R / 255f - adjustSpeed;
+        float g = _canvasModulate.G / 255f - adjustSpeed;
+        float b = _canvasModulate.B / 255f - adjustSpeed;
+        _canvasModulate = new Color(
+            Math.Max(0f, r),
+            Math.Max(0f, g),
+            Math.Max(0f, b)
+        );
+        _console.Log($"Canvas Modulate: R={_canvasModulate.R}, G={_canvasModulate.G}, B={_canvasModulate.B}");
+    }
+
+    
+    // Temp Camera mode toggle 
+    if (keyboard.IsKeyDown(Keys.T) && !_previousKeyboard.IsKeyDown(Keys.T))
             {
-                _postProcessing.BloomThreshold += adjustSpeed;
-                _console.Log($"Bloom Threshold: {_postProcessing.BloomThreshold:F2}");
-            }
-            if (keyboard.IsKeyDown(Keys.A))
-            {
-                _postProcessing.BloomThreshold -= adjustSpeed;
-                _postProcessing.BloomThreshold = Math.Max(0f, _postProcessing.BloomThreshold);
-                _console.Log($"Bloom Threshold: {_postProcessing.BloomThreshold:F2}");
+                if (_camera.Mode == CameraMode.Room)
+                {
+                    _camera.Mode = CameraMode.Follow;
+                    _console.LogSuccess("Camera Mode: FOLLOW");
+                }
+                else
+                {
+                    _camera.Mode = CameraMode.Room;
+                    _console.LogSuccess("Camera Mode: ROOM");
+                }
             }
 
-            if (keyboard.IsKeyDown(Keys.W))
-            {
-                _postProcessing.BloomIntensity += adjustSpeed * 2f;
-                _console.Log($"Bloom Intensity: {_postProcessing.BloomIntensity:F2}");
-            }
-            if (keyboard.IsKeyDown(Keys.S))
-            {
-                _postProcessing.BloomIntensity -= adjustSpeed * 2f;
-                _postProcessing.BloomIntensity = Math.Max(0f, _postProcessing.BloomIntensity);
-                _console.Log($"Bloom Intensity: {_postProcessing.BloomIntensity:F2}");
-            }
-
-            if (keyboard.IsKeyDown(Keys.E))
-            {
-                float r = _canvasModulate.R / 255f + adjustSpeed;
-                float g = _canvasModulate.G / 255f + adjustSpeed;
-                float b = _canvasModulate.B / 255f + adjustSpeed;
-                _canvasModulate = new Color(
-                    Math.Min(1f, r),
-                    Math.Min(1f, g),
-                    Math.Min(1f, b)
-                );
-                _console.Log($"Canvas Modulate: R={_canvasModulate.R}, G={_canvasModulate.G}, B={_canvasModulate.B}");
-            }
-            if (keyboard.IsKeyDown(Keys.D))
-            {
-                float r = _canvasModulate.R / 255f - adjustSpeed;
-                float g = _canvasModulate.G / 255f - adjustSpeed;
-                float b = _canvasModulate.B / 255f - adjustSpeed;
-                _canvasModulate = new Color(
-                    Math.Max(0f, r),
-                    Math.Max(0f, g),
-                    Math.Max(0f, b)
-                );
-                _console.Log($"Canvas Modulate: R={_canvasModulate.R}, G={_canvasModulate.G}, B={_canvasModulate.B}");
-            }
-
-            if (keyboard.IsKeyDown(Keys.R) && !_previousKeyboard.IsKeyDown(Keys.R))
-            {
-                _postProcessing.BloomThreshold = 0.5f;
-                _postProcessing.BloomIntensity = 0.7f;
-                _canvasModulate = new Color(0xc5, 0x00, 0xa8, 0xff);
-                _console.LogSuccess("Reset to defaults!");
-            }
-        }
-
+    if (keyboard.IsKeyDown(Keys.R) && !_previousKeyboard.IsKeyDown(Keys.R))
+    {
+        _postProcessing.BloomThreshold = 0.5f;
+        _postProcessing.BloomIntensity = 0.7f;
+        _canvasModulate = new Color(0xc5, 0x00, 0xa8, 0xff);
+        _console.LogSuccess("Reset to defaults!");
+    }
+}
         public void Draw(GameTime gameTime)
         {
             _postProcessing.BeginGameRender();
