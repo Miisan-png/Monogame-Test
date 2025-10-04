@@ -155,7 +155,11 @@ namespace Snow.Editor
                 }
             }
 
-            if (ImGui.IsWindowHovered() && !ImGui.GetIO().WantCaptureMouse)
+            // Check if mouse is within the canvas bounds
+            bool mouseInCanvas = mousePos.X >= canvasPos.X && mousePos.X <= canvasPos.X + canvasSize.X &&
+                                mousePos.Y >= canvasPos.Y && mousePos.Y <= canvasPos.Y + canvasSize.Y;
+            
+            if (mouseInCanvas && ImGui.IsWindowFocused())
             {
                 HandleTileInput(viewOffset, mousePos, tileSize);
             }

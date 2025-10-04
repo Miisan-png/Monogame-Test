@@ -10,6 +10,7 @@ namespace Snow.Editor
         private SceneView _sceneView;
         private LevelEditorView _levelEditorView;
         private ActorEditor _actorEditor;
+        private SceneHierarchy _sceneHierarchy;
         private TilemapEditorOverlay _tilemapOverlay;
         private TilePalettePanel _tilePalette;
         private ToolsPanel _toolsPanel;
@@ -30,6 +31,9 @@ namespace Snow.Editor
             _levelEditorView = new LevelEditorView(_tilemapOverlay, graphicsDevice, imGuiRenderer);
             _actorEditor = new ActorEditor(graphicsDevice, imGuiRenderer);
             _actorEditor.SetSceneChangedCallback(OnActorEditorSceneChanged);
+            _sceneHierarchy = new SceneHierarchy();
+            _sceneHierarchy.SetEntitySelectedCallback(OnEntitySelected);
+            _sceneHierarchy.SetSceneModifiedCallback(OnSceneModified);
             _tilePalette = new TilePalettePanel(_tilemapOverlay);
             _toolsPanel = new ToolsPanel(_tilemapOverlay, _actorEditor);
             
@@ -90,6 +94,49 @@ namespace Snow.Editor
         {
             System.Console.WriteLine($"[Editor] Actor editor saved scene, reloading game: {scenePath}");
             _gameRenderer.ReloadLevel();
+            
+            // Reload scene data in hierarchy
+            if (!string.IsNullOrEmpty(scenePath))
+            {
+                try
+                {
+                    var sceneData = SceneParser.ParseScene(scenePath);
+                    _sceneHierarchy.LoadScene(sceneData, scenePath);
+                    _sceneView.LoadScene(sceneData);
+                }
+                catch (Exception ex)
+                {
+                    System.Console.WriteLine($"[Editor] Failed to reload scene in hierarchy: {ex.Message}");
+                }
+            }
+        }
+
+        private void OnEntitySelected(int entityIndex)
+        {
+            System.Console.WriteLine($"[Editor] Entity selected: {entityIndex}");
+            _sceneView.SetSelectedEntity(entityIndex);
+            
+            // Also select in actor editor if it's the same entity
+            // This keeps the views in sync
+        }
+
+        private void OnSceneModified()
+        {
+            System.Console.WriteLine($"[Editor] Scene modified in hierarchy");
+            // Auto-save the scene
+            if (_currentScene != null && !string.IsNullOrEmpty(_currentScenePath))
+            {
+                try
+                {
+                    SceneSerializer.SaveScene(_currentScene, _currentScenePath);
+                    System.Console.WriteLine($"[Editor] Scene auto-saved: {_currentScenePath}");
+                    _gameRenderer.ReloadLevel();
+                }
+                catch (Exception ex)
+                {
+                    System.Console.WriteLine($"[Editor] Failed to auto-save scene: {ex.Message}");
+                }
+            }
         }
 
         public void SetGameTexturePtr(System.IntPtr texturePtr)
@@ -131,6 +178,8 @@ namespace Snow.Editor
                 }
                 
                 _actorEditor.LoadSceneData(_currentScene, scenePath);
+                _sceneHierarchy.LoadScene(_currentScene, scenePath);
+                _sceneView.LoadScene(_currentScene);
                 
                 SetupFileWatchers();
                 
@@ -177,106 +226,113 @@ namespace Snow.Editor
         }
 
         public void Render()
-{
-    ImGui.DockSpaceOverViewport(ImGui.GetMainViewport());
-
-    if (ImGui.BeginMainMenuBar())
-    {
-        if (ImGui.BeginMenu("File"))
         {
-            if (ImGui.MenuItem("Open Scene"))
+            ImGui.DockSpaceOverViewport(ImGui.GetMainViewport());
+
+            if (ImGui.BeginMainMenuBar())
             {
-                string path = ShowOpenFileDialog("scene");
-                if (!string.IsNullOrEmpty(path))
+                if (ImGui.BeginMenu("File"))
                 {
-                    LoadSceneFile(path);
-                }
-            }
+                    if (ImGui.MenuItem("Open Scene"))
+                    {
+                        string path = ShowOpenFileDialog("scene");
+                        if (!string.IsNullOrEmpty(path))
+                        {
+                            LoadSceneFile(path);
+                        }
+                    }
 
-            if (ImGui.MenuItem("Save Scene", null, false, _currentScene != null))
-            {
-                if (!string.IsNullOrEmpty(_currentScenePath))
+                    if (ImGui.MenuItem("Save Scene", null, false, _currentScene != null))
+                    {
+                        if (!string.IsNullOrEmpty(_currentScenePath))
+                        {
+                            _actorEditor.SaveSceneData();
+                            System.Console.WriteLine($"[Editor] Scene saved: {_currentScenePath}");
+                        }
+                    }
+
+                    ImGui.Separator();
+
+                    if (ImGui.MenuItem("Reload Scene", "Ctrl+R", false, _currentScene != null))
+                    {
+                        if (!string.IsNullOrEmpty(_currentScenePath))
+                        {
+                            LoadSceneFile(_currentScenePath);
+                            _gameRenderer.ReloadLevel();
+                        }
+                    }
+
+                    ImGui.EndMenu();
+                }
+
+                if (ImGui.BeginMenu("Windows"))
                 {
-                    _actorEditor.SaveSceneData();
-                    System.Console.WriteLine($"[Editor] Scene saved: {_currentScenePath}");
+                    bool sceneViewOpen = _sceneView.IsOpen;
+                    if (ImGui.MenuItem("Scene View", null, sceneViewOpen))
+                    {
+                        _sceneView.IsOpen = !_sceneView.IsOpen;
+                    }
+
+                    bool sceneHierarchyOpen = _sceneHierarchy.IsOpen;
+                    if (ImGui.MenuItem("Scene Hierarchy", null, sceneHierarchyOpen))
+                    {
+                        _sceneHierarchy.IsOpen = !_sceneHierarchy.IsOpen;
+                    }
+
+                    bool levelEditorOpen = _levelEditorView.IsOpen;
+                    if (ImGui.MenuItem("Level Editor", null, levelEditorOpen))
+                    {
+                        _levelEditorView.IsOpen = !_levelEditorView.IsOpen;
+                    }
+
+                    bool actorEditorOpen = _actorEditor.IsOpen;
+                    if (ImGui.MenuItem("Actor Editor", null, actorEditorOpen))
+                    {
+                        _actorEditor.IsOpen = !_actorEditor.IsOpen;
+                    }
+
+                    bool tilePaletteOpen = _tilePalette.IsOpen;
+                    if (ImGui.MenuItem("Tile Palette", null, tilePaletteOpen))
+                    {
+                        _tilePalette.IsOpen = !_tilePalette.IsOpen;
+                    }
+
+                    bool toolsPanelOpen = _toolsPanel.IsOpen;
+                    if (ImGui.MenuItem("Tools", null, toolsPanelOpen))
+                    {
+                        _toolsPanel.IsOpen = !_toolsPanel.IsOpen;
+                    }
+
+                    ImGui.EndMenu();
                 }
-            }
 
-            ImGui.Separator();
-
-            if (ImGui.MenuItem("Reload Scene", "Ctrl+R", false, _currentScene != null))
-            {
-                if (!string.IsNullOrEmpty(_currentScenePath))
+                if (ImGui.BeginMenu("Themes"))
                 {
-                    LoadSceneFile(_currentScenePath);
-                    _gameRenderer.ReloadLevel();
+                    if (ImGui.MenuItem("Dark", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Dark))
+                        ThemeManager.ApplyTheme(ThemeManager.Theme.Dark);
+
+                    if (ImGui.MenuItem("Light", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Light))
+                        ThemeManager.ApplyTheme(ThemeManager.Theme.Light);
+
+                    if (ImGui.MenuItem("Classic", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Classic))
+                        ThemeManager.ApplyTheme(ThemeManager.Theme.Classic);
+
+                    if (ImGui.MenuItem("Custom Blue", null, ThemeManager.CurrentTheme == ThemeManager.Theme.CustomBlue))
+                        ThemeManager.ApplyTheme(ThemeManager.Theme.CustomBlue);
+
+                    ImGui.EndMenu();
                 }
+                
+                ImGui.EndMainMenuBar();
             }
 
-            ImGui.EndMenu();
+            _sceneView.Render();
+            _sceneHierarchy.Render();
+            _levelEditorView.Render();
+            _actorEditor.Render();
+            _tilePalette.Render();
+            _toolsPanel.Render();
         }
-
-        if (ImGui.BeginMenu("Windows"))
-        {
-            bool sceneViewOpen = _sceneView.IsOpen;
-            if (ImGui.MenuItem("Scene View", null, sceneViewOpen))
-            {
-                _sceneView.IsOpen = !_sceneView.IsOpen;
-            }
-
-            bool levelEditorOpen = _levelEditorView.IsOpen;
-            if (ImGui.MenuItem("Level Editor", null, levelEditorOpen))
-            {
-                _levelEditorView.IsOpen = !_levelEditorView.IsOpen;
-            }
-
-            bool actorEditorOpen = _actorEditor.IsOpen;
-            if (ImGui.MenuItem("Actor Editor", null, actorEditorOpen))
-            {
-                _actorEditor.IsOpen = !_actorEditor.IsOpen;
-            }
-
-            bool tilePaletteOpen = _tilePalette.IsOpen;
-            if (ImGui.MenuItem("Tile Palette", null, tilePaletteOpen))
-            {
-                _tilePalette.IsOpen = !_tilePalette.IsOpen;
-            }
-
-            bool toolsPanelOpen = _toolsPanel.IsOpen;
-            if (ImGui.MenuItem("Tools", null, toolsPanelOpen))
-            {
-                _toolsPanel.IsOpen = !_toolsPanel.IsOpen;
-            }
-
-            ImGui.EndMenu();
-        }
-
-        if (ImGui.BeginMenu("Themes"))
-        {
-            if (ImGui.MenuItem("Dark", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Dark))
-                ThemeManager.ApplyTheme(ThemeManager.Theme.Dark);
-
-            if (ImGui.MenuItem("Light", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Light))
-                ThemeManager.ApplyTheme(ThemeManager.Theme.Light);
-
-            if (ImGui.MenuItem("Classic", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Classic))
-                ThemeManager.ApplyTheme(ThemeManager.Theme.Classic);
-
-            if (ImGui.MenuItem("Custom Blue", null, ThemeManager.CurrentTheme == ThemeManager.Theme.CustomBlue))
-                ThemeManager.ApplyTheme(ThemeManager.Theme.CustomBlue);
-
-            ImGui.EndMenu();
-        }
-        
-        ImGui.EndMainMenuBar();
-    }
-
-    _sceneView.Render();
-    _levelEditorView.Render();
-    _actorEditor.Render();
-    _tilePalette.Render();
-    _toolsPanel.Render();
-}
 
         private string ShowOpenFileDialog(string extension)
         {
