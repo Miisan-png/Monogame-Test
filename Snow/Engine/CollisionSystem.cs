@@ -46,6 +46,7 @@ namespace Snow.Engine
                 actorBox.X = (int)position.X;
             }
             
+            bool hitWallX = false;
             if (CheckTileCollision(actorBox, tilemap))
             {
                 while (CheckTileCollision(actorBox, tilemap) && Math.Abs(movement.X) > 0.01f)
@@ -62,6 +63,7 @@ namespace Snow.Engine
                     }
                 }
                 velocity.X = 0;
+                hitWallX = true;
             }
 
             position.Y += movement.Y;
@@ -115,20 +117,41 @@ namespace Snow.Engine
             }
             bool isGrounded = CheckTileCollision(groundCheck, tilemap);
 
+            bool isWallSliding = false;
+            int wallDirection = 0;
+            
+            if (actor is Game.Player player2 && !isGrounded && velocity.Y > 0 && hitWallX)
+            {
+                var leftWallCheck = new Rectangle(actorBox.X - 1, actorBox.Y + 4, 1, actorBox.Height - 8);
+                var rightWallCheck = new Rectangle(actorBox.Right, actorBox.Y + 4, 1, actorBox.Height - 8);
+                
+                if (CheckTileCollision(leftWallCheck, tilemap) && movement.X < 0)
+                {
+                    isWallSliding = true;
+                    wallDirection = -1;
+                }
+                else if (CheckTileCollision(rightWallCheck, tilemap) && movement.X > 0)
+                {
+                    isWallSliding = true;
+                    wallDirection = 1;
+                }
+            }
+
             actor.Position = position;
             actor.Velocity = velocity;
             
-            if (actor is Game.Player player2)
+            if (actor is Game.Player player3)
             {
-                var physicsField = player2.GetType().GetField("_physics", 
+                var physicsField = player3.GetType().GetField("_physics", 
                     System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
                 if (physicsField != null)
                 {
-                    var physics = physicsField.GetValue(player2) as PhysicsComponent;
+                    var physics = physicsField.GetValue(player3) as PhysicsComponent;
                     if (physics != null)
                     {
                         physics.IsGrounded = isGrounded;
                         physics.Velocity = velocity;
+                        physics.SetWallSliding(isWallSliding, wallDirection);
                     }
                 }
             }

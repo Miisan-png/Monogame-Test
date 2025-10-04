@@ -28,13 +28,30 @@ namespace Snow.Game
         private float _dustTimer;
         private bool _wasGrounded;
         private bool _wasDashing;
+        private bool _wasWallSliding;
         private List<GhostTrail> _ghostTrails;
         private float _ghostSpawnTimer;
         private Color _dashColor = new Color(100, 200, 255, 255);
+        private Color _wallSlideColor = new Color(255, 150, 100, 255);
         private Color _normalColor = Color.White;
         private float _coyoteTimer;
         private float _jumpBufferTimer;
         private CollisionShape _collisionShape;
+        private float _wallSlideParticleTimer;
+        private int _wallDirection;
+        private bool _canWallJump;
+        private float _wallJumpCooldown;
+        private float _stamina;
+        private float _maxStamina = 100f;
+        private float _staminaDrainRate = 30f;
+        private float _staminaRegenRate = 60f;
+        private bool _isClimbing;
+        private float _climbSpeed = 80f;
+
+        public float Stamina => _stamina;
+        public float MaxStamina => _maxStamina;
+        public bool IsWallSliding => _physics.IsWallSliding;
+        public bool IsClimbing => _isClimbing;
 
         public Player(Vector2 position, GraphicsDevice graphicsDevice, InputManager input, GraphicsManager graphics, ParticleSystem particles, Camera camera) : base(position)
         {
@@ -50,10 +67,17 @@ namespace Snow.Game
             _dustTimer = 0f;
             _wasGrounded = false;
             _wasDashing = false;
+            _wasWallSliding = false;
             _ghostTrails = new List<GhostTrail>();
             _ghostSpawnTimer = 0f;
             _coyoteTimer = 0f;
             _jumpBufferTimer = 0f;
+            _wallSlideParticleTimer = 0f;
+            _wallDirection = 0;
+            _canWallJump = false;
+            _wallJumpCooldown = 0f;
+            _stamina = _maxStamina;
+            _isClimbing = false;
             
             _collisionShape = new CollisionShape
             {
@@ -114,6 +138,16 @@ namespace Snow.Game
                 walk.Frames.Add(_graphics.LoadTexture($"player_walk_{i}", $"assets/Main/Player/Player{i}.png"));
             _sprite.AddAnimation(walk);
 
+            Animation wallSlide = new Animation("wallSlide", 0.15f, true);
+            for (int i = 1; i <= 3; i++)
+                wallSlide.Frames.Add(_graphics.LoadTexture($"player_wallslide_{i}", $"assets/Main/Player/Player{i}.png"));
+            _sprite.AddAnimation(wallSlide);
+
+            Animation climb = new Animation("climb", 0.12f, true);
+            for (int i = 4; i <= 6; i++)
+                climb.Frames.Add(_graphics.LoadTexture($"player_climb_{i}", $"assets/Main/Player/Player{i}.png"));
+            _sprite.AddAnimation(climb);
+
             _sprite.Play("idle");
         }
 
@@ -124,18 +158,130 @@ namespace Snow.Game
             float moveY = _input.GetAxisVertical();
             bool jumpPressed = _input.IsKeyPressed(Keys.C);
             bool jumpReleased = _input.IsKeyReleased(Keys.C);
+            bool jumpHeld = _input.IsKeyDown(Keys.C);
             bool dashPressed = _input.IsKeyPressed(Keys.X);
 
-            if (_physics.IsGrounded) _coyoteTimer = 0.12f; else _coyoteTimer -= dt;
-            if (jumpPressed) _jumpBufferTimer = 0.12f; else _jumpBufferTimer -= dt;
+            UpdateTimers(dt);
+            CheckWallContact();
+            HandleStamina(dt, moveY, jumpHeld);
+            HandleWallSliding(dt, moveX, moveY, jumpHeld);
+            HandleClimbing(dt, moveX, moveY, jumpHeld);
 
-            bool canJump = (_coyoteTimer > 0f && jumpPressed) || (_physics.IsGrounded && _jumpBufferTimer > 0f);
+            bool canJump = (_coyoteTimer > 0f && jumpPressed) || 
+                          (_physics.IsGrounded && _jumpBufferTimer > 0f) ||
+                          (_canWallJump && jumpPressed && _wallJumpCooldown <= 0f);
+            
             bool dashInput = dashPressed && _physics.CanDash;
 
             if (!_wasDashing && dashInput) _camera.Shake(4f, 0.2f);
 
-            _physics.Update(dt, moveX, moveY, canJump, jumpReleased, dashInput);
+            Vector2 wallJumpDirection = Vector2.Zero;
+            if (_canWallJump && jumpPressed && _wallJumpCooldown <= 0f)
+            {
+                wallJumpDirection = new Vector2(-_wallDirection * 1.2f, -1.5f);
+                _wallJumpCooldown = 0.3f;
+                _physics.ResetCoyoteTime();
+                
+                Vector2 particlePos = Position + new Vector2(_wallDirection > 0 ? 16 : 0, 12);
+                _particles.EmitBurst(particlePos, 8, 40f, 80f, new Color(255, 200, 100), 0.5f, 1.5f);
+                _camera.Shake(3f, 0.15f);
+            }
 
+            _physics.Update(dt, moveX, moveY, canJump, jumpReleased, dashInput, wallJumpDirection);
+
+            HandleEffects(dt, moveX);
+            UpdateAnimations(moveX);
+
+            if (!_wasGrounded && _physics.IsGrounded)
+            {
+                Vector2 landPos = Position + new Vector2(8, 24);
+                _particles.EmitBurst(landPos, 10, 30f, 70f, new Color(220, 220, 220), 0.4f, 1.2f);
+                _camera.Shake(2f, 0.15f);
+                _stamina = _maxStamina;
+            }
+
+            if (!_wasWallSliding && _physics.IsWallSliding)
+            {
+                Vector2 wallPos = Position + new Vector2(_wallDirection > 0 ? 16 : 0, 12);
+                _particles.EmitBurst(wallPos, 5, 20f, 40f, new Color(200, 150, 100), 0.3f, 1.0f);
+            }
+
+            _wasGrounded = _physics.IsGrounded;
+            _wasDashing = _physics.IsDashing;
+            _wasWallSliding = _physics.IsWallSliding;
+            _sprite.Update(dt);
+            Velocity = _physics.Velocity;
+        }
+
+        private void UpdateTimers(float dt)
+        {
+            if (_physics.IsGrounded) _coyoteTimer = 0.12f; else _coyoteTimer -= dt;
+            if (_input.IsKeyPressed(Keys.C)) _jumpBufferTimer = 0.12f; else _jumpBufferTimer -= dt;
+            if (_wallJumpCooldown > 0f) _wallJumpCooldown -= dt;
+        }
+
+        private void CheckWallContact()
+        {
+            _wallDirection = 0;
+            _canWallJump = false;
+
+            if (_physics.IsWallSliding)
+            {
+                float moveX = _input.GetAxisHorizontal();
+                if (moveX > 0.1f) _wallDirection = 1;
+                else if (moveX < -0.1f) _wallDirection = -1;
+                
+                if (_wallDirection != 0 && !_physics.IsGrounded)
+                {
+                    _canWallJump = true;
+                }
+            }
+        }
+
+        private void HandleStamina(float dt, float moveY, bool jumpHeld)
+        {
+            if (_isClimbing || (_physics.IsWallSliding && jumpHeld))
+            {
+                _stamina -= _staminaDrainRate * dt;
+                if (_stamina < 0f) _stamina = 0f;
+            }
+            else if (_physics.IsGrounded || !_physics.IsWallSliding)
+            {
+                _stamina += _staminaRegenRate * dt;
+                if (_stamina > _maxStamina) _stamina = _maxStamina;
+            }
+        }
+
+        private void HandleWallSliding(float dt, float moveX, float moveY, bool jumpHeld)
+        {
+            if (_physics.IsWallSliding && !_physics.IsGrounded && !_physics.IsDashing)
+            {
+                _wallSlideParticleTimer += dt;
+                if (_wallSlideParticleTimer > 0.1f)
+                {
+                    Vector2 wallPos = Position + new Vector2(_wallDirection > 0 ? 16 : -2, 8 + (float)(new System.Random().NextDouble() * 8));
+                    Vector2 particleVel = new Vector2(-_wallDirection * 20f, (float)(new System.Random().NextDouble() * 10 + 5));
+                    _particles.Emit(wallPos, particleVel, new Color(180, 120, 80), 0.4f, 0.8f);
+                    _wallSlideParticleTimer = 0f;
+                }
+            }
+        }
+
+        private void HandleClimbing(float dt, float moveX, float moveY, bool jumpHeld)
+        {
+            _isClimbing = false;
+            
+            if (_physics.IsWallSliding && jumpHeld && _stamina > 0f && System.Math.Abs(moveY) > 0.1f)
+            {
+                _isClimbing = true;
+                Vector2 vel = _physics.Velocity;
+                vel.Y = moveY * _climbSpeed;
+                _physics.Velocity = vel;
+            }
+        }
+
+        private void HandleEffects(float dt, float moveX)
+        {
             if (_physics.IsDashing)
             {
                 _ghostSpawnTimer += dt;
@@ -150,8 +296,6 @@ namespace Snow.Game
 
             if (System.Math.Abs(moveX) > 0.1f && _physics.IsGrounded)
             {
-                _sprite.Play("walk");
-                _sprite.FlipX = moveX < 0;
                 _dustTimer += dt;
                 if (_dustTimer > 0.12f)
                 {
@@ -161,30 +305,42 @@ namespace Snow.Game
                     _dustTimer = 0f;
                 }
             }
+        }
+
+        private void UpdateAnimations(float moveX)
+        {
+            if (_physics.IsDashing)
+            {
+                return;
+            }
+            else if (_isClimbing)
+            {
+                _sprite.Play("climb");
+            }
+            else if (_physics.IsWallSliding)
+            {
+                _sprite.Play("wallSlide");
+                _sprite.FlipX = _wallDirection < 0;
+            }
+            else if (System.Math.Abs(moveX) > 0.1f && _physics.IsGrounded)
+            {
+                _sprite.Play("walk");
+                _sprite.FlipX = moveX < 0;
+            }
             else
             {
                 _sprite.Play("idle");
             }
 
-            if (System.Math.Abs(moveX) > 0.1f)
+            if (System.Math.Abs(moveX) > 0.1f && !_physics.IsWallSliding)
                 _sprite.FlipX = moveX < 0;
-
-            if (!_wasGrounded && _physics.IsGrounded)
-            {
-                Vector2 landPos = Position + new Vector2(8, 24);
-                _particles.EmitBurst(landPos, 10, 30f, 70f, new Color(220, 220, 220), 0.4f, 1.2f);
-                _camera.Shake(2f, 0.15f);
-            }
-
-            _wasGrounded = _physics.IsGrounded;
-            _wasDashing = _physics.IsDashing;
-            _sprite.Update(dt);
-            Velocity = _physics.Velocity;
         }
 
         private void SpawnGhostTrail()
         {
             Texture2D frame = _graphics.GetTexture("player_walk_7");
+            Color trailColor = _physics.IsWallSliding ? _wallSlideColor : _dashColor;
+            
             _ghostTrails.Add(new GhostTrail
             {
                 Position = Position,
@@ -192,7 +348,7 @@ namespace Snow.Game
                 Alpha = 0.28f,
                 Life = 0.32f,
                 FlipX = _sprite.FlipX,
-                Tint = new Color(100, 200, 255, 255)
+                Tint = trailColor
             });
         }
 
@@ -226,7 +382,16 @@ namespace Snow.Game
                 spriteBatch.Draw(g.Texture, g.Position, null, ghostColor, 0f, Vector2.Zero, 1f, fx, 0f);
             }
 
-            Color drawColor = _physics.IsDashing ? _dashColor : _normalColor;
+            Color drawColor = _physics.IsDashing ? _dashColor : 
+                             _physics.IsWallSliding ? _wallSlideColor : 
+                             _normalColor;
+            
+            if (_stamina < 20f && (_isClimbing || _physics.IsWallSliding))
+            {
+                float pulse = (float)System.Math.Sin(gameTime.TotalGameTime.TotalSeconds * 8) * 0.3f + 0.7f;
+                drawColor = Color.Lerp(drawColor, Color.Red, 1f - pulse);
+            }
+
             _sprite.Draw(spriteBatch, Position, drawColor, 1f);
         }
 

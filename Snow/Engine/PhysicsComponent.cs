@@ -7,9 +7,11 @@ namespace Snow.Engine
     {
         public Vector2 Velocity { get; set; }
         public bool IsGrounded { get; set; }
+        public bool IsWallSliding { get; set; }
 
         public float Gravity { get; set; } = 1400f;
         public float MaxFallSpeed { get; set; } = 320f;
+        public float WallSlideSpeed { get; set; } = 60f;
         public float MoveSpeed { get; set; } = 120f;
         public float Acceleration { get; set; } = 800f;
         public float AirAcceleration { get; set; } = 700f;
@@ -17,6 +19,7 @@ namespace Snow.Engine
         public float AirFriction { get; set; } = 400f;
 
         public float JumpSpeed { get; set; } = 240f;
+        public float WallJumpSpeed { get; set; } = 220f;
         public float JumpCutMultiplier { get; set; } = 0.5f;
         public float CoyoteTime { get; set; } = 0.1f;
         public float JumpBufferTime { get; set; } = 0.1f;
@@ -33,17 +36,20 @@ namespace Snow.Engine
         private Vector2 _dashDirection;
         private bool _isDashing;
         private bool _dashesLeft;
+        private int _wallDirection;
 
         public bool IsDashing => _isDashing;
         public bool CanDash => _dashesLeft && _dashCooldownTimer <= 0;
         public Vector2 DashDirection => _dashDirection;
+        public int WallDirection => _wallDirection;
 
         public PhysicsComponent()
         {
             _dashesLeft = true;
+            _wallDirection = 0;
         }
 
-        public void Update(float deltaTime, float moveInput, float verticalInput, bool jumpPressed, bool jumpReleased, bool dashPressed)
+        public void Update(float deltaTime, float moveInput, float verticalInput, bool jumpPressed, bool jumpReleased, bool dashPressed, Vector2 wallJumpDirection = default)
         {
             UpdateTimers(deltaTime);
 
@@ -53,12 +59,26 @@ namespace Snow.Engine
                 return;
             }
 
-            ApplyGravity(deltaTime);
-            ApplyMovement(deltaTime, moveInput);
-            HandleJump(jumpPressed, jumpReleased);
-            HandleDash(dashPressed, moveInput, verticalInput);
+            if (wallJumpDirection != Vector2.Zero)
+            {
+                Vector2 vel = Velocity;
+                vel.X = wallJumpDirection.X * WallJumpSpeed;
+                vel.Y = wallJumpDirection.Y * JumpSpeed;
+                Velocity = vel;
+                _coyoteTimer = 0;
+                _jumpBufferTimer = 0;
+            }
+            else
+            {
+                ApplyGravity(deltaTime);
+                ApplyMovement(deltaTime, moveInput);
+                HandleJump(jumpPressed, jumpReleased);
+            }
 
-            if (IsGrounded)
+            HandleDash(dashPressed, moveInput, verticalInput);
+            HandleWallSliding();
+
+            if (IsGrounded || IsWallSliding)
             {
                 _dashesLeft = true;
             }
@@ -81,9 +101,18 @@ namespace Snow.Engine
         private void ApplyGravity(float deltaTime)
         {
             Vector2 vel = Velocity;
-            vel.Y += Gravity * deltaTime;
-            if (vel.Y > MaxFallSpeed)
-                vel.Y = MaxFallSpeed;
+            
+            if (IsWallSliding && vel.Y > 0)
+            {
+                vel.Y = Math.Min(vel.Y, WallSlideSpeed);
+            }
+            else
+            {
+                vel.Y += Gravity * deltaTime;
+                if (vel.Y > MaxFallSpeed)
+                    vel.Y = MaxFallSpeed;
+            }
+            
             Velocity = vel;
         }
 
@@ -171,13 +200,20 @@ namespace Snow.Engine
             }
         }
 
+        private void HandleWallSliding()
+        {
+            
+        }
+
+        public void SetWallSliding(bool wallSliding, int wallDirection)
+        {
+            IsWallSliding = wallSliding;
+            _wallDirection = wallDirection;
+        }
+
         public void ResetCoyoteTime()
         {
             _coyoteTimer = 0;
         }
     }
 }
-
-
-
-
