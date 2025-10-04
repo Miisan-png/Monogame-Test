@@ -41,9 +41,12 @@ namespace Snow.Engine
         private Rectangle _bounds;
         private bool _hasBounds = false;
 
+        public Action OnTransitionStart;
+
         public int ViewportWidth => _viewportWidth;
         public int ViewportHeight => _viewportHeight;
         public CameraMode Mode { get => _mode; set => _mode = value; }
+        public bool IsTransitioning => _isTransitioning;
 
         public Camera(int viewportWidth, int viewportHeight, int virtualWidth, int virtualHeight)
         {
@@ -105,11 +108,11 @@ namespace Snow.Engine
                     _isTransitioning = true;
                     _transitionProgress = 0f;
                     _transitionStartPos = Position;
+                    OnTransitionStart?.Invoke();
                 }
             }
             else if (_mode == CameraMode.Follow)
             {
-                // Follow mode 
             }
         }
 

@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Snow.Engine;
 using System.Collections.Generic;
+using System;
 
 namespace Snow.Game
 {
@@ -16,40 +17,66 @@ namespace Snow.Game
         public Color Tint;
     }
 
+    public class DashTrailParticle
+    {
+        public Vector2 Position;
+        public Vector2 Velocity;
+        public float Alpha;
+        public float Life;
+        public float MaxLife;
+    }
+
+    public class SpriteParticle
+    {
+        public Vector2 Position;
+        public List<Texture2D> Frames;
+        public int CurrentFrame;
+        public float FrameTimer;
+        public float FrameTime;
+        public bool Active;
+        public float Rotation;
+        public Vector2 Origin;
+    }
+
     public class Player : Actor
     {
         private PhysicsComponent _physics;
         private InputManager _input;
         private AnimatedSprite _sprite;
         private GraphicsManager _graphics;
-        private ParticleSystem _particles;
         private Camera _camera;
         public Vector2 Size { get; set; }
-        private float _dustTimer;
         private bool _wasGrounded;
         private bool _wasDashing;
-        private bool _wasWallSliding;
         private List<GhostTrail> _ghostTrails;
         private float _ghostSpawnTimer;
         private Color _dashColor = new Color(100, 200, 255, 255);
-        private Color _wallSlideColor = new Color(255, 150, 100, 255);
         private Color _normalColor = Color.White;
         private float _coyoteTimer;
         private float _jumpBufferTimer;
         private CollisionShape _collisionShape;
-        private float _wallSlideParticleTimer;
         private int _wallDirection;
         private bool _canWallJump;
         private float _wallJumpCooldown;
         private float _stamina;
         private float _maxStamina = 100f;
-        private float _staminaDrainRate = 30f;
         private float _staminaRegenRate = 60f;
         private bool _isClimbing;
         private float _climbSpeed = 80f;
-
         private bool _isDead = false;
         private Vector2 _respawnPosition;
+        private List<SpriteParticle> _spriteParticles;
+        private List<Texture2D> _jumpParticles;
+        private List<Texture2D> _landParticles;
+        private List<Texture2D> _dashLineParticles;
+        private List<DashTrailParticle> _dashTrail;
+        private Texture2D _dashPixel;
+        private float _dashTrailSpawnTimer;
+        private Color _dashTrailColor = new Color(100, 200, 255);
+        private float _lastDashDirection;
+        private bool _dashJustEnded;
+        private bool _isFrozen;
+        private float _freezeTimer;
 
         public float Stamina => _stamina;
         public float MaxStamina => _maxStamina;
@@ -62,27 +89,32 @@ namespace Snow.Game
             Size = new Vector2(16, 24);
             _input = input;
             _graphics = graphics;
-            _particles = particles;
             _camera = camera;
             _physics = new PhysicsComponent();
             _physics.IsGrounded = true;
             _sprite = new AnimatedSprite();
             LoadAnimations();
-            _dustTimer = 0f;
             _wasGrounded = false;
             _wasDashing = false;
-            _wasWallSliding = false;
             _ghostTrails = new List<GhostTrail>();
             _ghostSpawnTimer = 0f;
             _coyoteTimer = 0f;
             _jumpBufferTimer = 0f;
-            _wallSlideParticleTimer = 0f;
             _wallDirection = 0;
             _canWallJump = false;
             _wallJumpCooldown = 0f;
             _stamina = _maxStamina;
             _isClimbing = false;
             _respawnPosition = position;
+            _spriteParticles = new List<SpriteParticle>();
+            _dashTrail = new List<DashTrailParticle>();
+            _dashTrailSpawnTimer = 0f;
+            _lastDashDirection = 0f;
+            _dashJustEnded = false;
+            _isFrozen = false;
+            _freezeTimer = 0f;
+
+            LoadParticleTextures(graphicsDevice);
             
             _collisionShape = new CollisionShape
             {
@@ -93,6 +125,43 @@ namespace Snow.Game
                 Height = 24,
                 Radius = 0
             };
+        }
+
+        private void LoadParticleTextures(GraphicsDevice device)
+        {
+            _jumpParticles = new List<Texture2D>();
+            _landParticles = new List<Texture2D>();
+            _dashLineParticles = new List<Texture2D>();
+
+            for (int i = 1; i <= 4; i++)
+            {
+                try
+                {
+                    _jumpParticles.Add(_graphics.LoadTexture($"jump_p{i}", $"assets/particles/jump_p{i}.png"));
+                }
+                catch { }
+            }
+
+            for (int i = 1; i <= 6; i++)
+            {
+                try
+                {
+                    _landParticles.Add(_graphics.LoadTexture($"land_p{i}", $"assets/particles/land_p{i}.png"));
+                }
+                catch { }
+            }
+
+            for (int i = 1; i <= 4; i++)
+            {
+                try
+                {
+                    _dashLineParticles.Add(_graphics.LoadTexture($"dash_line_p{i}", $"assets/particles/dash_line_p{i}.png"));
+                }
+                catch { }
+            }
+
+            _dashPixel = new Texture2D(device, 1, 1);
+            _dashPixel.SetData(new[] { Color.White });
         }
 
         public void SetRespawnPosition(Vector2 position)
@@ -106,21 +175,6 @@ namespace Snow.Game
             
             _isDead = true;
             IsActive = false;
-            
-            Vector2 center = Position + new Vector2(8, 12);
-            
-            for (int i = 0; i < 30; i++)
-            {
-                float angle = (float)(i / 30.0 * System.Math.PI * 2);
-                float speed = 80f + (float)(new System.Random().NextDouble() * 60f);
-                Vector2 velocity = new Vector2(
-                    (float)System.Math.Cos(angle) * speed,
-                    (float)System.Math.Sin(angle) * speed
-                );
-                
-                _particles.Emit(center, velocity, new Color(255, 200, 200), 0.8f, 2.5f);
-            }
-            
             _camera.Shake(8f, 0.3f);
         }
 
@@ -133,18 +187,18 @@ namespace Snow.Game
             _physics.Velocity = Vector2.Zero;
             _stamina = _maxStamina;
             _physics.IsGrounded = false;
-            
-            for (int i = 0; i < 15; i++)
-            {
-                float angle = (float)(i / 15.0 * System.Math.PI * 2);
-                float speed = 40f;
-                Vector2 velocity = new Vector2(
-                    (float)System.Math.Cos(angle) * speed,
-                    (float)System.Math.Sin(angle) * speed
-                );
-                
-                _particles.Emit(_respawnPosition + new Vector2(8, 12), velocity, new Color(150, 220, 255), 0.6f, 1.5f);
-            }
+        }
+
+        public void Freeze(float duration)
+        {
+            _isFrozen = true;
+            _freezeTimer = duration;
+        }
+
+        public void Unfreeze()
+        {
+            _isFrozen = false;
+            _freezeTimer = 0f;
         }
 
         public void ApplyCollisionShape(CollisionShape shape)
@@ -213,6 +267,19 @@ namespace Snow.Game
             if (_isDead) return;
 
             float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+            if (_isFrozen)
+            {
+                _freezeTimer -= dt;
+                if (_freezeTimer <= 0f)
+                {
+                    _isFrozen = false;
+                    _freezeTimer = 0f;
+                }
+                _sprite.Update(dt);
+                return;
+            }
+
             float moveX = _input.GetAxisHorizontal();
             float moveY = _input.GetAxisVertical();
             bool jumpPressed = _input.IsKeyPressed(Keys.C);
@@ -223,7 +290,6 @@ namespace Snow.Game
             UpdateTimers(dt);
             CheckWallContact();
             HandleStamina(dt, moveY, jumpHeld);
-            HandleWallSliding(dt, moveX, moveY, jumpHeld);
             HandleClimbing(dt, moveX, moveY, jumpHeld);
 
             bool canJump = (_coyoteTimer > 0f && jumpPressed) || 
@@ -232,7 +298,11 @@ namespace Snow.Game
             
             bool dashInput = dashPressed && _physics.CanDash;
 
-            if (!_wasDashing && dashInput) _camera.Shake(4f, 0.2f);
+            if (!_wasDashing && dashInput)
+            {
+                _camera.Shake(4f, 0.2f);
+                SpawnDashParticles();
+            }
 
             Vector2 wallJumpDirection = Vector2.Zero;
             if (_canWallJump && jumpPressed && _wallJumpCooldown <= 0f)
@@ -240,36 +310,44 @@ namespace Snow.Game
                 wallJumpDirection = new Vector2(-_wallDirection * 1.2f, -1.5f);
                 _wallJumpCooldown = 0.3f;
                 _physics.ResetCoyoteTime();
-                
-                Vector2 particlePos = Position + new Vector2(_wallDirection > 0 ? 16 : 0, 12);
-                _particles.EmitBurst(particlePos, 8, 40f, 80f, new Color(255, 200, 100), 0.5f, 1.5f);
                 _camera.Shake(3f, 0.15f);
+            }
+
+            if (canJump && _physics.IsGrounded && !_wasDashing)
+            {
+                SpawnJumpParticles();
             }
 
             _physics.Update(dt, moveX, moveY, canJump, jumpReleased, dashInput, wallJumpDirection);
 
-            HandleEffects(dt, moveX);
+            HandleDashEffects(dt, moveX);
             UpdateAnimations(moveX);
 
             if (!_wasGrounded && _physics.IsGrounded)
             {
-                Vector2 landPos = Position + new Vector2(8, 24);
-                _particles.EmitBurst(landPos, 10, 30f, 70f, new Color(220, 220, 220), 0.4f, 1.2f);
-                _camera.Shake(2f, 0.15f);
+                SpawnLandParticles();
+                _camera.Shake(1f, 0.08f);
                 _stamina = _maxStamina;
             }
 
-            if (!_wasWallSliding && _physics.IsWallSliding)
+            if (_wasDashing && !_physics.IsDashing)
             {
-                Vector2 wallPos = Position + new Vector2(_wallDirection > 0 ? 16 : 0, 12);
-                _particles.EmitBurst(wallPos, 5, 20f, 40f, new Color(200, 150, 100), 0.3f, 1.0f);
+                _dashJustEnded = true;
+                ScatterDashParticles();
+            }
+            else if (!_physics.IsDashing)
+            {
+                _dashJustEnded = false;
             }
 
             _wasGrounded = _physics.IsGrounded;
             _wasDashing = _physics.IsDashing;
-            _wasWallSliding = _physics.IsWallSliding;
             _sprite.Update(dt);
             Velocity = _physics.Velocity;
+
+            UpdateSpriteParticles(dt);
+            UpdateDashTrail(dt);
+            UpdateGhostTrails(dt);
         }
 
         private void UpdateTimers(float dt)
@@ -299,30 +377,10 @@ namespace Snow.Game
 
         private void HandleStamina(float dt, float moveY, bool jumpHeld)
         {
-            if (_isClimbing || (_physics.IsWallSliding && jumpHeld))
-            {
-                _stamina -= _staminaDrainRate * dt;
-                if (_stamina < 0f) _stamina = 0f;
-            }
-            else if (_physics.IsGrounded || !_physics.IsWallSliding)
+            if (_physics.IsGrounded || !_physics.IsWallSliding)
             {
                 _stamina += _staminaRegenRate * dt;
                 if (_stamina > _maxStamina) _stamina = _maxStamina;
-            }
-        }
-
-        private void HandleWallSliding(float dt, float moveX, float moveY, bool jumpHeld)
-        {
-            if (_physics.IsWallSliding && !_physics.IsGrounded && !_physics.IsDashing)
-            {
-                _wallSlideParticleTimer += dt;
-                if (_wallSlideParticleTimer > 0.1f)
-                {
-                    Vector2 wallPos = Position + new Vector2(_wallDirection > 0 ? 16 : -2, 8 + (float)(new System.Random().NextDouble() * 8));
-                    Vector2 particleVel = new Vector2(-_wallDirection * 20f, (float)(new System.Random().NextDouble() * 10 + 5));
-                    _particles.Emit(wallPos, particleVel, new Color(180, 120, 80), 0.4f, 0.8f);
-                    _wallSlideParticleTimer = 0f;
-                }
             }
         }
 
@@ -339,29 +397,176 @@ namespace Snow.Game
             }
         }
 
-        private void HandleEffects(float dt, float moveX)
+        private void HandleDashEffects(float dt, float moveX)
         {
             if (_physics.IsDashing)
             {
+                Vector2 dashDir = _physics.DashDirection;
+                _lastDashDirection = (float)Math.Atan2(dashDir.Y, dashDir.X);
+
                 _ghostSpawnTimer += dt;
-                if (_ghostSpawnTimer > 0.06f)
+                if (_ghostSpawnTimer > 0.05f)
                 {
                     SpawnGhostTrail();
                     _ghostSpawnTimer = 0f;
                 }
-            }
 
-            UpdateGhostTrails(dt);
-
-            if (System.Math.Abs(moveX) > 0.1f && _physics.IsGrounded)
-            {
-                _dustTimer += dt;
-                if (_dustTimer > 0.12f)
+                _dashTrailSpawnTimer += dt;
+                if (_dashTrailSpawnTimer > 0.03f)
                 {
-                    Vector2 dustPos = Position + new Vector2(8, 24);
-                    Vector2 dustDir = new Vector2(-System.Math.Sign(moveX), -0.5f);
-                    _particles.EmitDust(dustPos, dustDir, 2, new Color(200, 200, 200));
-                    _dustTimer = 0f;
+                    Random rand = new Random();
+                    Vector2 offset = new Vector2(
+                        (float)(rand.NextDouble() - 0.5) * 10f,
+                        (float)(rand.NextDouble() - 0.5) * 10f
+                    );
+
+                    Vector2 backwardVel = -dashDir * (20f + (float)rand.NextDouble() * 15f);
+
+                    _dashTrail.Add(new DashTrailParticle
+                    {
+                        Position = Position + new Vector2(8, 12) + offset,
+                        Velocity = backwardVel,
+                        Alpha = 0.8f,
+                        Life = 0.7f,
+                        MaxLife = 0.7f
+                    });
+                    _dashTrailSpawnTimer = 0f;
+                }
+            }
+        }
+
+        private void ScatterDashParticles()
+        {
+            Random rand = new Random();
+            foreach (var particle in _dashTrail)
+            {
+                float angle = (float)(rand.NextDouble() * Math.PI * 2);
+                float speed = 30f + (float)rand.NextDouble() * 40f;
+                particle.Velocity = new Vector2(
+                    (float)Math.Cos(angle) * speed,
+                    (float)Math.Sin(angle) * speed
+                );
+            }
+        }
+
+        private void UpdateDashTrail(float dt)
+        {
+            for (int i = _dashTrail.Count - 1; i >= 0; i--)
+            {
+                var particle = _dashTrail[i];
+                particle.Life -= dt;
+                particle.Position += particle.Velocity * dt;
+                particle.Velocity *= 0.92f;
+                
+                float t = particle.Life / particle.MaxLife;
+                particle.Alpha = t * 0.7f;
+
+                if (particle.Life <= 0f)
+                {
+                    _dashTrail.RemoveAt(i);
+                }
+            }
+        }
+
+        private void SpawnGhostTrail()
+        {
+            Texture2D frame = _graphics.GetTexture("player_walk_7");
+            
+            _ghostTrails.Add(new GhostTrail
+            {
+                Position = Position,
+                Texture = frame,
+                Alpha = 0.28f,
+                Life = 0.32f,
+                FlipX = _sprite.FlipX,
+                Tint = _dashColor
+            });
+        }
+
+        private void UpdateGhostTrails(float dt)
+        {
+            for (int i = _ghostTrails.Count - 1; i >= 0; i--)
+            {
+                _ghostTrails[i].Life -= dt;
+                float t = _ghostTrails[i].Life / 0.32f;
+                if (t < 0f) t = 0f;
+                _ghostTrails[i].Alpha = t * 0.28f;
+                if (_ghostTrails[i].Life <= 0f)
+                    _ghostTrails.RemoveAt(i);
+            }
+        }
+
+        private void SpawnJumpParticles()
+        {
+            if (_jumpParticles.Count == 0) return;
+
+            _spriteParticles.Add(new SpriteParticle
+            {
+                Position = Position + new Vector2(8, 35),
+                Frames = new List<Texture2D>(_jumpParticles),
+                CurrentFrame = 0,
+                FrameTimer = 0f,
+                FrameTime = 0.05f,
+                Active = true,
+                Rotation = 0f,
+                Origin = new Vector2(_jumpParticles[0].Width / 2, _jumpParticles[0].Height)
+            });
+        }
+
+        private void SpawnLandParticles()
+        {
+            if (_landParticles.Count == 0) return;
+
+            _spriteParticles.Add(new SpriteParticle
+            {
+                Position = Position + new Vector2(8, 35),
+                Frames = new List<Texture2D>(_landParticles),
+                CurrentFrame = 0,
+                FrameTimer = 0f,
+                FrameTime = 0.05f,
+                Active = true,
+                Rotation = 0f,
+                Origin = new Vector2(_landParticles[0].Width / 2, _landParticles[0].Height)
+            });
+        }
+
+        private void SpawnDashParticles()
+        {
+            if (_dashLineParticles.Count == 0) return;
+
+            Vector2 dashDir = _physics.DashDirection;
+            float rotation = (float)Math.Atan2(dashDir.Y, dashDir.X);
+
+            _spriteParticles.Add(new SpriteParticle
+            {
+                Position = Position + new Vector2(8, 12),
+                Frames = new List<Texture2D>(_dashLineParticles),
+                CurrentFrame = 0,
+                FrameTimer = 0f,
+                FrameTime = 0.04f,
+                Active = true,
+                Rotation = rotation,
+                Origin = new Vector2(_dashLineParticles[0].Width / 2, _dashLineParticles[0].Height / 2)
+            });
+        }
+
+        private void UpdateSpriteParticles(float dt)
+        {
+            for (int i = _spriteParticles.Count - 1; i >= 0; i--)
+            {
+                var particle = _spriteParticles[i];
+                particle.FrameTimer += dt;
+
+                if (particle.FrameTimer >= particle.FrameTime)
+                {
+                    particle.FrameTimer = 0f;
+                    particle.CurrentFrame++;
+
+                    if (particle.CurrentFrame >= particle.Frames.Count)
+                    {
+                        particle.Active = false;
+                        _spriteParticles.RemoveAt(i);
+                    }
                 }
             }
         }
@@ -395,38 +600,16 @@ namespace Snow.Game
                 _sprite.FlipX = moveX < 0;
         }
 
-        private void SpawnGhostTrail()
-        {
-            Texture2D frame = _graphics.GetTexture("player_walk_7");
-            Color trailColor = _physics.IsWallSliding ? _wallSlideColor : _dashColor;
-            
-            _ghostTrails.Add(new GhostTrail
-            {
-                Position = Position,
-                Texture = frame,
-                Alpha = 0.28f,
-                Life = 0.32f,
-                FlipX = _sprite.FlipX,
-                Tint = trailColor
-            });
-        }
-
-        private void UpdateGhostTrails(float dt)
-        {
-            for (int i = _ghostTrails.Count - 1; i >= 0; i--)
-            {
-                _ghostTrails[i].Life -= dt;
-                float t = _ghostTrails[i].Life / 0.32f;
-                if (t < 0f) t = 0f;
-                _ghostTrails[i].Alpha = t * 0.28f;
-                if (_ghostTrails[i].Life <= 0f)
-                    _ghostTrails.RemoveAt(i);
-            }
-        }
-
         public override void Draw(SpriteBatch spriteBatch, GameTime gameTime)
         {
             if (!IsActive) return;
+
+            foreach (var trail in _dashTrail)
+            {
+                byte alpha = (byte)(trail.Alpha * 255);
+                Color trailColor = new Color(_dashTrailColor.R, _dashTrailColor.G, _dashTrailColor.B, alpha);
+                spriteBatch.Draw(_dashPixel, trail.Position, null, trailColor, 0f, new Vector2(0.5f), 1.8f, SpriteEffects.None, 0f);
+            }
 
             for (int i = 0; i < _ghostTrails.Count; i++)
             {
@@ -441,9 +624,25 @@ namespace Snow.Game
                 spriteBatch.Draw(g.Texture, g.Position, null, ghostColor, 0f, Vector2.Zero, 1f, fx, 0f);
             }
 
-            Color drawColor = _physics.IsDashing ? _dashColor : 
-                             _physics.IsWallSliding ? _wallSlideColor : 
-                             _normalColor;
+            foreach (var particle in _spriteParticles)
+            {
+                if (particle.Active && particle.CurrentFrame < particle.Frames.Count)
+                {
+                    spriteBatch.Draw(
+                        particle.Frames[particle.CurrentFrame],
+                        particle.Position,
+                        null,
+                        Color.White,
+                        particle.Rotation,
+                        particle.Origin,
+                        1f,
+                        SpriteEffects.None,
+                        0f
+                    );
+                }
+            }
+
+            Color drawColor = _physics.IsDashing ? _dashColor : _normalColor;
             
             if (_stamina < 20f && (_isClimbing || _physics.IsWallSliding))
             {

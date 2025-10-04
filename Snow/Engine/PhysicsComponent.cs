@@ -35,17 +35,17 @@ namespace Snow.Engine
         private float _dashCooldownTimer;
         private Vector2 _dashDirection;
         private bool _isDashing;
-        private bool _dashesLeft;
+        private bool _canDash;
         private int _wallDirection;
 
         public bool IsDashing => _isDashing;
-        public bool CanDash => _dashesLeft && _dashCooldownTimer <= 0;
+        public bool CanDash => _canDash && _dashCooldownTimer <= 0;
         public Vector2 DashDirection => _dashDirection;
         public int WallDirection => _wallDirection;
 
         public PhysicsComponent()
         {
-            _dashesLeft = true;
+            _canDash = true;
             _wallDirection = 0;
         }
 
@@ -78,9 +78,9 @@ namespace Snow.Engine
             HandleDash(dashPressed, moveInput, verticalInput);
             HandleWallSliding();
 
-            if (IsGrounded || IsWallSliding)
+            if (IsGrounded)
             {
-                _dashesLeft = true;
+                _canDash = true;
             }
         }
 
@@ -172,7 +172,7 @@ namespace Snow.Engine
                 _isDashing = true;
                 _dashTimer = DashTime;
                 _dashCooldownTimer = DashCooldown;
-                _dashesLeft = false;
+                _canDash = false;
 
                 Vector2 dir = new Vector2(moveInput, verticalInput);
                 
@@ -202,7 +202,6 @@ namespace Snow.Engine
 
         private void HandleWallSliding()
         {
-            
         }
 
         public void SetWallSliding(bool wallSliding, int wallDirection)
