@@ -14,6 +14,9 @@ namespace Snow.Editor
         private TilemapEditorOverlay _tilemapOverlay;
         private TilePalettePanel _tilePalette;
         private ToolsPanel _toolsPanel;
+
+        private ColorModulatePanel _colorModulatePanel;
+
         
         private string _currentScenePath;
         private SceneData _currentScene;
@@ -37,6 +40,7 @@ namespace Snow.Editor
             _sceneHierarchy.SetSceneModifiedCallback(OnSceneModified);
             _tilePalette = new TilePalettePanel(_tilemapOverlay);
             _toolsPanel = new ToolsPanel(_tilemapOverlay, _actorEditor);
+            _colorModulatePanel = new ColorModulatePanel();
             
             _fileWatcher = new MultiFileWatcher();
             
@@ -268,113 +272,120 @@ namespace Snow.Editor
         }
 
         public void Render()
+{
+    ImGui.DockSpaceOverViewport(ImGui.GetMainViewport());
+
+    if (ImGui.BeginMainMenuBar())
+    {
+        if (ImGui.BeginMenu("File"))
         {
-            ImGui.DockSpaceOverViewport(ImGui.GetMainViewport());
-
-            if (ImGui.BeginMainMenuBar())
+            if (ImGui.MenuItem("Open Scene"))
             {
-                if (ImGui.BeginMenu("File"))
+                string path = ShowOpenFileDialog("scene");
+                if (!string.IsNullOrEmpty(path))
                 {
-                    if (ImGui.MenuItem("Open Scene"))
-                    {
-                        string path = ShowOpenFileDialog("scene");
-                        if (!string.IsNullOrEmpty(path))
-                        {
-                            LoadSceneFile(path);
-                        }
-                    }
-
-                    if (ImGui.MenuItem("Save Scene", null, false, _currentScene != null))
-                    {
-                        if (!string.IsNullOrEmpty(_currentScenePath))
-                        {
-                            _actorEditor.SaveSceneData();
-                            System.Console.WriteLine($"[Editor] Scene saved: {_currentScenePath}");
-                        }
-                    }
-
-                    ImGui.Separator();
-
-                    if (ImGui.MenuItem("Reload Scene", "Ctrl+R", false, _currentScene != null))
-                    {
-                        if (!string.IsNullOrEmpty(_currentScenePath))
-                        {
-                            LoadSceneFile(_currentScenePath);
-                            _gameRenderer.ReloadLevel();
-                        }
-                    }
-
-                    ImGui.EndMenu();
+                    LoadSceneFile(path);
                 }
-
-                if (ImGui.BeginMenu("Windows"))
-                {
-                    bool sceneViewOpen = _sceneView.IsOpen;
-                    if (ImGui.MenuItem("Scene View", null, sceneViewOpen))
-                    {
-                        _sceneView.IsOpen = !_sceneView.IsOpen;
-                    }
-
-                    bool sceneHierarchyOpen = _sceneHierarchy.IsOpen;
-                    if (ImGui.MenuItem("Scene Hierarchy", null, sceneHierarchyOpen))
-                    {
-                        _sceneHierarchy.IsOpen = !_sceneHierarchy.IsOpen;
-                    }
-
-                    bool levelEditorOpen = _levelEditorView.IsOpen;
-                    if (ImGui.MenuItem("Level Editor", null, levelEditorOpen))
-                    {
-                        _levelEditorView.IsOpen = !_levelEditorView.IsOpen;
-                    }
-
-                    bool actorEditorOpen = _actorEditor.IsOpen;
-                    if (ImGui.MenuItem("Actor Editor", null, actorEditorOpen))
-                    {
-                        _actorEditor.IsOpen = !_actorEditor.IsOpen;
-                    }
-
-                    bool tilePaletteOpen = _tilePalette.IsOpen;
-                    if (ImGui.MenuItem("Tile Palette", null, tilePaletteOpen))
-                    {
-                        _tilePalette.IsOpen = !_tilePalette.IsOpen;
-                    }
-
-                    bool toolsPanelOpen = _toolsPanel.IsOpen;
-                    if (ImGui.MenuItem("Tools", null, toolsPanelOpen))
-                    {
-                        _toolsPanel.IsOpen = !_toolsPanel.IsOpen;
-                    }
-
-                    ImGui.EndMenu();
-                }
-
-                if (ImGui.BeginMenu("Themes"))
-                {
-                    if (ImGui.MenuItem("Dark", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Dark))
-                        ThemeManager.ApplyTheme(ThemeManager.Theme.Dark);
-
-                    if (ImGui.MenuItem("Light", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Light))
-                        ThemeManager.ApplyTheme(ThemeManager.Theme.Light);
-
-                    if (ImGui.MenuItem("Classic", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Classic))
-                        ThemeManager.ApplyTheme(ThemeManager.Theme.Classic);
-
-                    if (ImGui.MenuItem("Custom Blue", null, ThemeManager.CurrentTheme == ThemeManager.Theme.CustomBlue))
-                        ThemeManager.ApplyTheme(ThemeManager.Theme.CustomBlue);
-
-                    ImGui.EndMenu();
-                }
-                
-                ImGui.EndMainMenuBar();
             }
 
-            _sceneView.Render();
-            _sceneHierarchy.Render();
-            _levelEditorView.Render();
-            _actorEditor.Render();
-            _tilePalette.Render();
-            _toolsPanel.Render();
+            if (ImGui.MenuItem("Save Scene", null, false, _currentScene != null))
+            {
+                if (!string.IsNullOrEmpty(_currentScenePath))
+                {
+                    _actorEditor.SaveSceneData();
+                    System.Console.WriteLine($"[Editor] Scene saved: {_currentScenePath}");
+                }
+            }
+
+            ImGui.Separator();
+
+            if (ImGui.MenuItem("Reload Scene", "Ctrl+R", false, _currentScene != null))
+            {
+                if (!string.IsNullOrEmpty(_currentScenePath))
+                {
+                    LoadSceneFile(_currentScenePath);
+                    _gameRenderer.ReloadLevel();
+                }
+            }
+
+            ImGui.EndMenu();
         }
+
+        if (ImGui.BeginMenu("Windows"))
+        {
+            bool sceneViewOpen = _sceneView.IsOpen;
+            if (ImGui.MenuItem("Scene View", null, sceneViewOpen))
+            {
+                _sceneView.IsOpen = !_sceneView.IsOpen;
+            }
+
+            bool sceneHierarchyOpen = _sceneHierarchy.IsOpen;
+            if (ImGui.MenuItem("Scene Hierarchy", null, sceneHierarchyOpen))
+            {
+                _sceneHierarchy.IsOpen = !_sceneHierarchy.IsOpen;
+            }
+
+            bool levelEditorOpen = _levelEditorView.IsOpen;
+            if (ImGui.MenuItem("Level Editor", null, levelEditorOpen))
+            {
+                _levelEditorView.IsOpen = !_levelEditorView.IsOpen;
+            }
+
+            bool actorEditorOpen = _actorEditor.IsOpen;
+            if (ImGui.MenuItem("Actor Editor", null, actorEditorOpen))
+            {
+                _actorEditor.IsOpen = !_actorEditor.IsOpen;
+            }
+
+            bool tilePaletteOpen = _tilePalette.IsOpen;
+            if (ImGui.MenuItem("Tile Palette", null, tilePaletteOpen))
+            {
+                _tilePalette.IsOpen = !_tilePalette.IsOpen;
+            }
+
+            bool toolsPanelOpen = _toolsPanel.IsOpen;
+            if (ImGui.MenuItem("Tools", null, toolsPanelOpen))
+            {
+                _toolsPanel.IsOpen = !_toolsPanel.IsOpen;
+            }
+
+            bool colorModulateOpen = _colorModulatePanel.IsOpen;
+            if (ImGui.MenuItem("Canvas Modulate", null, colorModulateOpen))
+            {
+                _colorModulatePanel.IsOpen = !_colorModulatePanel.IsOpen;
+            }
+
+            ImGui.EndMenu();
+        }
+
+        if (ImGui.BeginMenu("Themes"))
+        {
+            if (ImGui.MenuItem("Dark", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Dark))
+                ThemeManager.ApplyTheme(ThemeManager.Theme.Dark);
+
+            if (ImGui.MenuItem("Light", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Light))
+                ThemeManager.ApplyTheme(ThemeManager.Theme.Light);
+
+            if (ImGui.MenuItem("Classic", null, ThemeManager.CurrentTheme == ThemeManager.Theme.Classic))
+                ThemeManager.ApplyTheme(ThemeManager.Theme.Classic);
+
+            if (ImGui.MenuItem("Custom Blue", null, ThemeManager.CurrentTheme == ThemeManager.Theme.CustomBlue))
+                ThemeManager.ApplyTheme(ThemeManager.Theme.CustomBlue);
+
+            ImGui.EndMenu();
+        }
+        
+        ImGui.EndMainMenuBar();
+    }
+
+    _sceneView.Render();
+    _sceneHierarchy.Render();
+    _levelEditorView.Render();
+    _actorEditor.Render();
+    _tilePalette.Render();
+    _toolsPanel.Render();
+    _colorModulatePanel.Render();
+}
 
         private string ShowOpenFileDialog(string extension)
         {

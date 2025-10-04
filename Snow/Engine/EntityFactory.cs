@@ -23,14 +23,20 @@ namespace Snow.Engine
             RegisterDefaultEntities();
         }
 
-        private static void RegisterDefaultEntities()
+        public static void RegisterDefaultEntities()
         {
             Register("PlayerSpawn", CreatePlayerSpawn);
             Register("Slime", CreateSlime);
             Register("Coin", CreateCoin);
             Register("Chest", CreateChest);
             Register("Spike", CreateSpike);
+            Register("Shard", CreateShard);
         }
+
+    private static IEntity CreateShard(EntityData data, GraphicsDevice device, GraphicsManager graphics, EntityFactoryContext context)
+    {
+        return new Game.Shard(data.Id, new Vector2(data.X, data.Y), device, context.Particles, context.Camera);
+    }
 
         public static void Register(string type, Func<EntityData, GraphicsDevice, GraphicsManager, EntityFactoryContext, IEntity> creator)
         {
@@ -85,11 +91,12 @@ namespace Snow.Engine
     }
 
     public class EntityFactoryContext
-    {
-        public InputManager Input { get; set; }
-        public ParticleSystem Particles { get; set; }
-        public Tilemap Tilemap { get; set; }
-    }
+        {
+            public InputManager Input { get; set; }
+            public ParticleSystem Particles { get; set; }
+            public Tilemap Tilemap { get; set; }
+            public Camera Camera { get; set; }
+        }
 
     public class PlayerSpawnEntity : IEntity
     {
