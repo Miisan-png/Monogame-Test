@@ -29,6 +29,7 @@ namespace Snow.Editor
             
             _sceneView = new SceneView(gameRenderer, _tilemapOverlay);
             _levelEditorView = new LevelEditorView(_tilemapOverlay, graphicsDevice, imGuiRenderer);
+            _levelEditorView.SetPlayerSpawnChangedCallback(OnPlayerSpawnChanged);
             _actorEditor = new ActorEditor(graphicsDevice, imGuiRenderer);
             _actorEditor.SetSceneChangedCallback(OnActorEditorSceneChanged);
             _sceneHierarchy = new SceneHierarchy();
@@ -95,7 +96,6 @@ namespace Snow.Editor
             System.Console.WriteLine($"[Editor] Actor editor saved scene, reloading game: {scenePath}");
             _gameRenderer.ReloadLevel();
             
-            // Reload scene data in hierarchy
             if (!string.IsNullOrEmpty(scenePath))
             {
                 try
@@ -103,6 +103,7 @@ namespace Snow.Editor
                     var sceneData = SceneParser.ParseScene(scenePath);
                     _sceneHierarchy.LoadScene(sceneData, scenePath);
                     _sceneView.LoadScene(sceneData);
+                    UpdateLevelEditorPlayerSpawn(sceneData);
                 }
                 catch (Exception ex)
                 {
@@ -115,15 +116,11 @@ namespace Snow.Editor
         {
             System.Console.WriteLine($"[Editor] Entity selected: {entityIndex}");
             _sceneView.SetSelectedEntity(entityIndex);
-            
-            // Also select in actor editor if it's the same entity
-            // This keeps the views in sync
         }
 
         private void OnSceneModified()
         {
             System.Console.WriteLine($"[Editor] Scene modified in hierarchy");
-            // Auto-save the scene
             if (_currentScene != null && !string.IsNullOrEmpty(_currentScenePath))
             {
                 try
@@ -135,6 +132,50 @@ namespace Snow.Editor
                 catch (Exception ex)
                 {
                     System.Console.WriteLine($"[Editor] Failed to auto-save scene: {ex.Message}");
+                }
+            }
+        }
+
+        private void OnPlayerSpawnChanged(System.Numerics.Vector2 newPosition)
+        {
+            UpdatePlayerSpawn(new Microsoft.Xna.Framework.Vector2(newPosition.X, newPosition.Y));
+        }
+
+        public void UpdatePlayerSpawn(Microsoft.Xna.Framework.Vector2 newPosition)
+        {
+            if (_currentScene != null)
+            {
+                foreach (var entity in _currentScene.Entities)
+                {
+                    if (entity.Type == "PlayerSpawn")
+                    {
+                        entity.X = newPosition.X;
+                        entity.Y = newPosition.Y;
+                        
+                        try
+                        {
+                            SceneSerializer.SaveScene(_currentScene, _currentScenePath);
+                            System.Console.WriteLine($"[Editor] Player spawn updated: ({newPosition.X}, {newPosition.Y})");
+                            _gameRenderer.ReloadLevel();
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Console.WriteLine($"[Editor] Failed to save player spawn: {ex.Message}");
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        private void UpdateLevelEditorPlayerSpawn(SceneData sceneData)
+        {
+            foreach (var entity in sceneData.Entities)
+            {
+                if (entity.Type == "PlayerSpawn")
+                {
+                    _levelEditorView.LoadSceneData(new System.Numerics.Vector2(entity.X, entity.Y));
+                    break;
                 }
             }
         }
@@ -180,6 +221,7 @@ namespace Snow.Editor
                 _actorEditor.LoadSceneData(_currentScene, scenePath);
                 _sceneHierarchy.LoadScene(_currentScene, scenePath);
                 _sceneView.LoadScene(_currentScene);
+                UpdateLevelEditorPlayerSpawn(_currentScene);
                 
                 SetupFileWatchers();
                 

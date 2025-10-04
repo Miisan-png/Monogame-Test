@@ -8,7 +8,7 @@ namespace Snow
 {
     public class Game1 : Microsoft.Xna.Framework.Game
     {
-        private const bool FULLSCREEN_ENABLED = false;
+        private const bool FULLSCREEN_ENABLED = true;
 
         private GraphicsDeviceManager _graphics;
         private MonoGame.ImGuiNet.ImGuiRenderer _imGuiRenderer;
