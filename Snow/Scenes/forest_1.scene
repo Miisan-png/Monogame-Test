@@ -1,6 +1,6 @@
 [scene]
 name = Forest Level 1 Enhanced
-tilemap = "levels/lvl.json"
+tilemap = "levels/lvl.tilemap"
 tileset = "assets/world_tileset.png"
 background_color = rgba(81, 73, 150, 1)
 properties = {properties: System.Collections.Generic.Dictionary`2[System.String,System.Object]}
@@ -10,4 +10,3 @@ type = "PlayerSpawn"
 position = 143.3, 80.9
 collision_shape = {type: "box", offset_x: 4.847059, offset_y: 1.317647, width: 12.800005, height: 23.65, radius: 0}
 sprite_data = {texture: "C:\Users\Azar\Desktop\Monogame\Monogame-Test\Snow\assets\Main\Player\Player1.png", origin_x: 0, origin_y: 0, scale_x: 1, scale_y: 1}
-
