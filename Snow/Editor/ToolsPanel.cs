@@ -125,14 +125,24 @@ namespace Snow.Editor
             ImGui.Separator();
 
             bool collisionMode = _tilemapOverlay.CollisionMode;
-            if (ImGui.RadioButton("Draw Tiles", !collisionMode))
+            bool spikeMode = _tilemapOverlay.SpikeMode;
+
+            if (ImGui.RadioButton("Draw Tiles", !collisionMode && !spikeMode))
             {
                 _tilemapOverlay.CollisionMode = false;
+                _tilemapOverlay.SpikeMode = false;
             }
             
             if (ImGui.RadioButton("Edit Collision", collisionMode))
             {
                 _tilemapOverlay.CollisionMode = true;
+                _tilemapOverlay.SpikeMode = false;
+            }
+
+            if (ImGui.RadioButton("Edit Spikes", spikeMode))
+            {
+                _tilemapOverlay.CollisionMode = false;
+                _tilemapOverlay.SpikeMode = true;
             }
 
             ImGui.Separator();
@@ -147,6 +157,12 @@ namespace Snow.Editor
             if (ImGui.Checkbox("Show Collision", ref showCollision))
             {
                 _tilemapOverlay.ShowCollisionOverlay = showCollision;
+            }
+
+            bool showSpikes = _tilemapOverlay.ShowSpikeOverlay;
+            if (ImGui.Checkbox("Show Spikes", ref showSpikes))
+            {
+                _tilemapOverlay.ShowSpikeOverlay = showSpikes;
             }
 
             ImGui.Separator();

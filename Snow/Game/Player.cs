@@ -48,10 +48,14 @@ namespace Snow.Game
         private bool _isClimbing;
         private float _climbSpeed = 80f;
 
+        private bool _isDead = false;
+        private Vector2 _respawnPosition;
+
         public float Stamina => _stamina;
         public float MaxStamina => _maxStamina;
         public bool IsWallSliding => _physics.IsWallSliding;
         public bool IsClimbing => _isClimbing;
+        public bool IsDead => _isDead;
 
         public Player(Vector2 position, GraphicsDevice graphicsDevice, InputManager input, GraphicsManager graphics, ParticleSystem particles, Camera camera) : base(position)
         {
@@ -78,6 +82,7 @@ namespace Snow.Game
             _wallJumpCooldown = 0f;
             _stamina = _maxStamina;
             _isClimbing = false;
+            _respawnPosition = position;
             
             _collisionShape = new CollisionShape
             {
@@ -88,6 +93,58 @@ namespace Snow.Game
                 Height = 24,
                 Radius = 0
             };
+        }
+
+        public void SetRespawnPosition(Vector2 position)
+        {
+            _respawnPosition = position;
+        }
+
+        public void Die()
+        {
+            if (_isDead) return;
+            
+            _isDead = true;
+            IsActive = false;
+            
+            Vector2 center = Position + new Vector2(8, 12);
+            
+            for (int i = 0; i < 30; i++)
+            {
+                float angle = (float)(i / 30.0 * System.Math.PI * 2);
+                float speed = 80f + (float)(new System.Random().NextDouble() * 60f);
+                Vector2 velocity = new Vector2(
+                    (float)System.Math.Cos(angle) * speed,
+                    (float)System.Math.Sin(angle) * speed
+                );
+                
+                _particles.Emit(center, velocity, new Color(255, 200, 200), 0.8f, 2.5f);
+            }
+            
+            _camera.Shake(8f, 0.3f);
+        }
+
+        public void Respawn()
+        {
+            _isDead = false;
+            IsActive = true;
+            Position = _respawnPosition;
+            Velocity = Vector2.Zero;
+            _physics.Velocity = Vector2.Zero;
+            _stamina = _maxStamina;
+            _physics.IsGrounded = false;
+            
+            for (int i = 0; i < 15; i++)
+            {
+                float angle = (float)(i / 15.0 * System.Math.PI * 2);
+                float speed = 40f;
+                Vector2 velocity = new Vector2(
+                    (float)System.Math.Cos(angle) * speed,
+                    (float)System.Math.Sin(angle) * speed
+                );
+                
+                _particles.Emit(_respawnPosition + new Vector2(8, 12), velocity, new Color(150, 220, 255), 0.6f, 1.5f);
+            }
         }
 
         public void ApplyCollisionShape(CollisionShape shape)
@@ -153,6 +210,8 @@ namespace Snow.Game
 
         public override void Update(GameTime gameTime)
         {
+            if (_isDead) return;
+
             float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
             float moveX = _input.GetAxisHorizontal();
             float moveY = _input.GetAxisVertical();

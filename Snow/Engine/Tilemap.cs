@@ -72,7 +72,13 @@ namespace Snow.Engine
 
                     Vector2 position = new Vector2(x * _data.TileSize, y * _data.TileSize);
 
-                    spriteBatch.Draw(_tileset, position, sourceRect, Color.White);
+                    Color tintColor = Color.White;
+                    if (_data.Spikes[y][x])
+                    {
+                        tintColor = new Color(255, 150, 150);
+                    }
+
+                    spriteBatch.Draw(_tileset, position, sourceRect, tintColor);
                 }
             }
         }
@@ -82,6 +88,34 @@ namespace Snow.Engine
             if (x < 0 || x >= _data.GridWidth || y < 0 || y >= _data.GridHeight)
                 return false;
             return _data.Collision[y][x];
+        }
+
+        public bool IsSpike(int x, int y)
+        {
+            if (x < 0 || x >= _data.GridWidth || y < 0 || y >= _data.GridHeight)
+                return false;
+            return _data.Spikes[y][x];
+        }
+
+        public bool CheckSpikeCollision(Rectangle bounds)
+        {
+            int startX = Math.Max(0, bounds.Left / _data.TileSize);
+            int startY = Math.Max(0, bounds.Top / _data.TileSize);
+            int endX = Math.Min(_data.GridWidth - 1, bounds.Right / _data.TileSize);
+            int endY = Math.Min(_data.GridHeight - 1, bounds.Bottom / _data.TileSize);
+
+            for (int y = startY; y <= endY; y++)
+            {
+                for (int x = startX; x <= endX; x++)
+                {
+                    if (_data.Spikes[y][x])
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         public bool IsColliding(Rectangle bounds)
@@ -130,6 +164,14 @@ namespace Snow.Engine
             if (x >= 0 && x < _data.GridWidth && y >= 0 && y < _data.GridHeight)
             {
                 _data.Collision[y][x] = solid;
+            }
+        }
+
+        public void SetSpikeAt(int x, int y, bool spike)
+        {
+            if (x >= 0 && x < _data.GridWidth && y >= 0 && y < _data.GridHeight)
+            {
+                _data.Spikes[y][x] = spike;
             }
         }
     }

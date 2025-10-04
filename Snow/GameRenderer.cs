@@ -41,6 +41,9 @@ namespace Snow
         private bool _isPaused = false;
         private string _currentScenePath = "scenes/forest_1.scene";
 
+        private float _respawnTimer = 0f;
+        private const float RESPAWN_DELAY = 2.0f;
+
         public RenderTarget2D GameRenderTarget { get; private set; }
         public bool IsGameStarted => _gameStarted;
         public bool IsPaused { get => _isPaused; set => _isPaused = value; }
@@ -72,8 +75,9 @@ namespace Snow
                     }
                 }
 
-                Vector2 currentPlayerPos = _player.Position;
-                _player = new Player(currentPlayerPos, _graphicsDevice, _input, _graphicsManager, _particles, _camera);
+                Vector2 spawnPos = scene.PlayerSpawnPosition;
+                _player = new Player(spawnPos, _graphicsDevice, _input, _graphicsManager, _particles, _camera);
+                _player.SetRespawnPosition(spawnPos);
 
                 if (playerSpawnData != null)
                 {
@@ -198,6 +202,7 @@ namespace Snow
                 }
 
                 _player = new Player(scene.PlayerSpawnPosition, _graphicsDevice, _input, _graphicsManager, _particles, _camera);
+                _player.SetRespawnPosition(scene.PlayerSpawnPosition);
 
                 if (playerSpawnData != null)
                 {
@@ -309,7 +314,29 @@ namespace Snow
 
             HandleBloomControls(keyboard, gameTime);
 
-            _player.Update(gameTime);
+            if (!_player.IsDead)
+            {
+                _player.Update(gameTime);
+
+                if (_sceneManager.CurrentScene != null && _sceneManager.CurrentScene.Tilemap != null)
+                {
+                    Rectangle playerBounds = _player.GetCollisionBox();
+                    
+                    if (_sceneManager.CurrentScene.Tilemap.CheckSpikeCollision(playerBounds))
+                    {
+                        _player.Die();
+                        _respawnTimer = RESPAWN_DELAY;
+                    }
+                }
+            }
+            else
+            {
+                _respawnTimer -= deltaTime;
+                if (_respawnTimer <= 0f)
+                {
+                    _player.Respawn();
+                }
+            }
 
             if (_sceneManager.CurrentScene != null)
             {
@@ -385,7 +412,7 @@ namespace Snow
                 _physicsParticleSpawnTimer = 0f;
             }
 
-            if (_sceneManager.CurrentScene != null)
+            if (_sceneManager.CurrentScene != null && !_player.IsDead)
             {
                 CollisionSystem.ResolveCollision(_player, _sceneManager.CurrentScene.Tilemap, deltaTime);
             }
@@ -477,8 +504,6 @@ namespace Snow
                 _console.Log($"Canvas Modulate: R={_canvasModulate.R}, G={_canvasModulate.G}, B={_canvasModulate.B}");
             }
 
-
-            // Temp Camera mode toggle 
             if (keyboard.IsKeyDown(Keys.T) && !_previousKeyboard.IsKeyDown(Keys.T))
             {
                 if (_camera.Mode == CameraMode.Room)
@@ -501,13 +526,12 @@ namespace Snow
                 _console.LogSuccess("Reset to defaults!");
             }
         }
+        
         public void Draw(GameTime gameTime)
         {
             _postProcessing.BeginGameRender();
 
             _graphicsDevice.Clear(new Color(24, 22, 43));
-
-
 
             if (_gameStarted)
             {
@@ -547,17 +571,12 @@ namespace Snow
 
             Rectangle destRect = new Rectangle(0, 0, GameRenderTarget.Width, GameRenderTarget.Height);
 
-
-
-
-
             var gameTexture = GetPostProcessingTexture("_gameRenderTarget");
             var bloomTexture = GetPostProcessingTexture("_bloomBlurVTarget");
 
             _graphicsManager.SpriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp);
             _graphicsManager.SpriteBatch.Draw(gameTexture, destRect, _canvasModulate);
             _graphicsManager.SpriteBatch.End();
-
 
             if (_postProcessing.BloomEnabled && bloomTexture != null)
             {
@@ -567,7 +586,6 @@ namespace Snow
             }
 
             _transitionManager.Draw();
-
 
             if (!_gameStarted || _mainMenu.CurrentState == MenuState.MainMenu)
             {
@@ -582,7 +600,6 @@ namespace Snow
                 _debugUI.Draw(_graphicsManager.SpriteBatch, _player, _camera, entityCount);
                 _debugUI.DrawCollisionBoxes(_graphicsManager.SpriteBatch, _player, _camera, _pixel);
             }
-
 
             _canvasUI.Draw(_graphicsManager.SpriteBatch);
 
@@ -602,10 +619,8 @@ namespace Snow
         }
 
         public void SetCanvasModulateColor(Microsoft.Xna.Framework.Color color)
-{
-    _canvasModulate = color;
-}
+        {
+            _canvasModulate = color;
+        }
     }
-    
-    
 }

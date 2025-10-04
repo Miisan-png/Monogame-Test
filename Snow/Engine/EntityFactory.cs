@@ -26,11 +26,10 @@ namespace Snow.Engine
         public static void RegisterDefaultEntities()
         {
             Register("PlayerSpawn", CreatePlayerSpawn);
-            Register("Slime", CreateSlime);
-            Register("Coin", CreateCoin);
+            Register("Shard", CreateShard);
             Register("Chest", CreateChest);
             Register("Spike", CreateSpike);
-            Register("Shard", CreateShard);
+            
         }
 
     private static IEntity CreateShard(EntityData data, GraphicsDevice device, GraphicsManager graphics, EntityFactoryContext context)

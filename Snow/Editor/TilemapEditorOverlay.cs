@@ -22,6 +22,7 @@ namespace Snow.Editor
         
         private List<Vector2> _selectedTiles = new List<Vector2>();
         private bool _collisionMode = false;
+        private bool _spikeMode = false;
         
         private string _currentMapPath = "";
         private bool _hasUnsavedChanges = false;
@@ -31,6 +32,7 @@ namespace Snow.Editor
         
         private bool _showGrid = true;
         private bool _showCollisionOverlay = true;
+        private bool _showSpikeOverlay = true;
 
         public TilemapEditorOverlay(GraphicsDevice graphicsDevice, MonoGame.ImGuiNet.ImGuiRenderer imGuiRenderer)
         {
@@ -202,6 +204,12 @@ namespace Snow.Editor
                         drawList.AddRectFilled(tileScreenPos, tileScreenPos + tileSizeVec, 
                             ImGui.GetColorU32(new Vector4(1.0f, 0.0f, 0.0f, 0.4f)));
                     }
+
+                    if (_showSpikeOverlay && _data.Spikes[y][x])
+                    {
+                        drawList.AddRectFilled(tileScreenPos, tileScreenPos + tileSizeVec, 
+                            ImGui.GetColorU32(new Vector4(1.0f, 0.5f, 0.0f, 0.5f)));
+                    }
                 }
             }
             
@@ -221,7 +229,11 @@ namespace Snow.Editor
             
             if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) || ImGui.IsMouseDragging(ImGuiMouseButton.Left))
             {
-                if (_collisionMode)
+                if (_spikeMode)
+                {
+                    SetSpikeTileInternal(gridX, gridY, true);
+                }
+                else if (_collisionMode)
                 {
                     SetCollisionTileInternal(gridX, gridY, true);
                 }
@@ -233,7 +245,11 @@ namespace Snow.Editor
             
             if (ImGui.IsMouseClicked(ImGuiMouseButton.Right) || ImGui.IsMouseDragging(ImGuiMouseButton.Right))
             {
-                if (_collisionMode)
+                if (_spikeMode)
+                {
+                    SetSpikeTileInternal(gridX, gridY, false);
+                }
+                else if (_collisionMode)
                 {
                     SetCollisionTileInternal(gridX, gridY, false);
                 }
@@ -277,6 +293,25 @@ namespace Snow.Editor
                 if (_data.Collision[y][x] != value)
                 {
                     _data.Collision[y][x] = value;
+                    MarkAsChanged();
+                }
+            }
+        }
+
+        internal bool GetSpikeAt(int x, int y)
+        {
+            if (x >= 0 && x < _data.GridWidth && y >= 0 && y < _data.GridHeight)
+                return _data.Spikes[y][x];
+            return false;
+        }
+
+        internal void SetSpikeAt(int x, int y, bool value)
+        {
+            if (x >= 0 && x < _data.GridWidth && y >= 0 && y < _data.GridHeight)
+            {
+                if (_data.Spikes[y][x] != value)
+                {
+                    _data.Spikes[y][x] = value;
                     MarkAsChanged();
                 }
             }
@@ -355,6 +390,18 @@ namespace Snow.Editor
             }
         }
 
+        private void SetSpikeTileInternal(int x, int y, bool value)
+        {
+            if (x >= 0 && x < _data.GridWidth && y >= 0 && y < _data.GridHeight)
+            {
+                if (_data.Spikes[y][x] != value)
+                {
+                    _data.Spikes[y][x] = value;
+                    MarkAsChanged();
+                }
+            }
+        }
+
         private void MarkAsChanged()
         {
             _hasUnsavedChanges = true;
@@ -362,8 +409,10 @@ namespace Snow.Editor
         }
 
         public bool CollisionMode { get => _collisionMode; set => _collisionMode = value; }
+        public bool SpikeMode { get => _spikeMode; set => _spikeMode = value; }
         public bool ShowGrid { get => _showGrid; set => _showGrid = value; }
         public bool ShowCollisionOverlay { get => _showCollisionOverlay; set => _showCollisionOverlay = value; }
+        public bool ShowSpikeOverlay { get => _showSpikeOverlay; set => _showSpikeOverlay = value; }
         public List<Vector2> SelectedTiles => _selectedTiles;
         public Texture2D TilesetTexture => _tilesetTexture;
         public IntPtr TilesetTexturePtr => _tilesetTexturePtr;

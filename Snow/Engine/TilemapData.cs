@@ -11,6 +11,7 @@ namespace Snow.Engine
         public int GridHeight { get; set; }
         public int[][] Tiles { get; set; }
         public bool[][] Collision { get; set; }
+        public bool[][] Spikes { get; set; }
 
         public TilemapData(int tileSize, int gridWidth, int gridHeight)
         {
@@ -20,11 +21,13 @@ namespace Snow.Engine
             
             Tiles = new int[gridHeight][];
             Collision = new bool[gridHeight][];
+            Spikes = new bool[gridHeight][];
             
             for (int y = 0; y < gridHeight; y++)
             {
                 Tiles[y] = new int[gridWidth];
                 Collision[y] = new bool[gridWidth];
+                Spikes[y] = new bool[gridWidth];
             }
         }
     }
@@ -32,7 +35,7 @@ namespace Snow.Engine
     public static class TilemapFormat
     {
         private const uint MAGIC = 0x544D4150;
-        private const ushort VERSION = 1;
+        private const ushort VERSION = 2;
 
         public static void Save(string path, TilemapData data)
         {
@@ -59,6 +62,14 @@ namespace Snow.Engine
                         writer.Write(data.Collision[y][x]);
                     }
                 }
+
+                for (int y = 0; y < data.GridHeight; y++)
+                {
+                    for (int x = 0; x < data.GridWidth; x++)
+                    {
+                        writer.Write(data.Spikes[y][x]);
+                    }
+                }
             }
 
             System.Console.WriteLine($"[TilemapFormat] Saved: {path}");
@@ -82,12 +93,6 @@ namespace Snow.Engine
                 }
 
                 ushort version = reader.ReadUInt16();
-                if (version != VERSION)
-                {
-                    System.Console.WriteLine($"[TilemapFormat] Unsupported version {version} in {path}");
-                    return null;
-                }
-
                 int tileSize = reader.ReadInt32();
                 int gridWidth = reader.ReadInt32();
                 int gridHeight = reader.ReadInt32();
@@ -107,6 +112,17 @@ namespace Snow.Engine
                     for (int x = 0; x < gridWidth; x++)
                     {
                         data.Collision[y][x] = reader.ReadBoolean();
+                    }
+                }
+
+                if (version >= 2)
+                {
+                    for (int y = 0; y < gridHeight; y++)
+                    {
+                        for (int x = 0; x < gridWidth; x++)
+                        {
+                            data.Spikes[y][x] = reader.ReadBoolean();
+                        }
                     }
                 }
 

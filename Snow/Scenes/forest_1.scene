@@ -10,3 +10,7 @@ position = 160, 90
 collision_shape = {type: "box", offset_x: 5.222222, offset_y: 2.0444446, width: 12.822222, height: 20.444445, radius: 0}
 sprite_data = {texture: "assets/Main/Player/Player1.png", origin_x: 0, origin_y: 0, scale_x: 1, scale_y: 1}
 
+[entity id="shard_1"]
+type = "Shard"
+position = 200, 90
+
